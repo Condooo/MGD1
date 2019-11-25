@@ -1,4 +1,14 @@
 body {
+    font-family: 'Joystix';
     width: 100%;
     height: 100%;
+}
+@font-face{
+    font-family: 'Joystix';
+    src: url('Joystix.eot');
+    src: url('Joystix.eot?#iefix') format('embedded-opentype'),
+         url('Joystix.woff2') format('woff2'),
+         url('Joystix.woff') format('woff'),
+         url(Joystix.ttf) format('truetype'),
+         url('Joystix.svg#svgFontName'), format('svg');
 }

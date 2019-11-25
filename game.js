@@ -10,6 +10,7 @@ var currentGameState = gameStates[0];
 var RequestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
 window.requestAnimationFrame = RequestAnimationFrame;
 
+var mobilePlatform = false;
 // Set dimensions to fullscreen
 var width = window.innerWidth;
 var height = window.innerHeight;
@@ -21,6 +22,20 @@ var UI = document.getElementById("layer3");
 var backgroundCtx = background.getContext("2d");
 var foregroundCtx = canvas.getContext("2d");
 var UICtx = UI.getContext("2d");
+
+
+// Set window dimensions for all layers
+background.width = width;
+background.height = height;
+canvas.width = width;
+canvas.height = height;
+UI.width = width;
+UI.height = height;
+
+// Set background canvas dimensions
+backgroundCtx.canvas.width = width;   
+backgroundCtx.canvas.height = height;
+
 // Store current and previous frame keystates
 var keys = [];
 var previousKeys = [];
@@ -35,7 +50,8 @@ var player = {
     width: 150,
     height: 150,
     velX: 0,
-    velY: 0
+    velY: 0,
+    facing: "right"
 };
 // -Animation
 var startTimeMS = 0;
@@ -58,25 +74,18 @@ var isGrounded = true;
 var imgCrate = new Image();
 var boxes = [];
 
-// Set window dimensions for all layers
-background.width = width;
-background.height = height;
-canvas.width = width;
-canvas.height = height;
-UI.width = width;
-UI.height = height;
-
-// Set background canvas dimensions
-backgroundCtx.canvas.width = width;   
-backgroundCtx.canvas.height = height;
 
 // Run setup when loaded
 window.addEventListener("load", function () {
+    if (DetectMobile())
+        mobilePlatform = true;
     Initialise();
     Update();
 });
 
-// Detect keypress for movement animation start
+
+
+// Set keydown
 document.body.addEventListener("keydown", function (e) {
     keys[e.keyCode] = true;
     if (e.keyCode == 40 || e.keyCode == 39 || e.keyCode == 38 || e.keyCode == 37) {
@@ -84,13 +93,44 @@ document.body.addEventListener("keydown", function (e) {
     }
 });
 
-// Detect keyup for movement animation end
+// Set keyup
 document.body.addEventListener("keyup", function (e) {
     keys[e.keyCode] = false;
     if (e.keyCode == 40 || e.keyCode == 39 || e.keyCode == 38 || e.keyCode == 37) {
         isKeyPressed = false;
     }
 });
+
+function DetectMobile() {
+    if (navigator.userAgent.match(/Android/i)
+        || navigator.userAgent.match(/webOS/i)
+        || navigator.userAgent.match(/iPhone/i)
+        || navigator.userAgent.match(/iPad/i)
+        || navigator.userAgent.match(/iPod/i)
+        || navigator.userAgent.match(/BlackBerry/i)
+        || navigator.userAgent.match(/Windows Phone/i)
+    ) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+// Compares keyboard states and returns true only once on key down
+function KeyDown(keycode) {
+    if (keys[keycode] && keys[keycode] != previousKeys[keycode])
+        return true;
+    else
+        return false;
+}
+// Compares keyboard states and returns true only once on key up
+function KeyUp(keycode) {
+    if (!keys[keycode] && keys[keycode] != previousKeys[keycode])
+        return true;
+    else
+        return false;
+}
 
 
 function Initialise() {
@@ -127,7 +167,7 @@ function Initialise() {
     }
     objects.push(player);
 
-
+    
 
 
     DrawUI();
@@ -237,27 +277,37 @@ function ApplyGravity() {
 }
 
 function PlayerControl() {
-    if (keys[40] && isGrounded) {
-        // Down arrow
-        if (player.y < (canvas.height - player.height - 20))
-            player.velY += speed;
+    if (mobilePlatform) {                                       // Mobile Input Handler
+        // TODO: Mobile input
     }
-    if (keys[38] && !previousKeys[38] && isGrounded) {
-        // Up arrow
-        if (player.y > 0) {
-            player.velY -= 50;
-            isGrounded = false;
+    else {                                                      // PC Input Handler
+        if (keys[83] && isGrounded) {                           // S: Down
+            if (player.y < (canvas.height - player.height - 20))
+                player.velY += speed;
         }
-    }
-    if (keys[39]) {
-        // Right arrow
-        if (player.x < (canvas.width - player.width - 20))
-            player.velX += speed;
-    }
-    if (keys[37]) {
-        // Left arrow
-        if (player.x > 0)
-            player.velX -= speed;
+        if (keys[87]) {                                         // W: Up
+
+        }
+        if (keys[68]) {                                         // D: Right
+            if (KeyDown(68)) {
+                console.log("pressed");
+                player.facing = "right";
+            }
+            if (player.x < (canvas.width - player.width - 20))
+                player.velX += speed;
+        }
+        if (keys[65]) {                                         // A: Left
+            if (KeyDown(65))
+                player.facing = "left";
+            if (player.x > 0)
+                player.velX -= speed;
+        }
+        if (keys[32] && !previousKeys[32] && isGrounded) {      // Space: Jump
+            if (player.y > 0) {
+                player.velY -= 30;
+                isGrounded = false;
+            }
+        }
     }
 
     // Update player's x-position
@@ -266,7 +316,6 @@ function PlayerControl() {
 }
 
 function ProcessInput() {
-
     switch (currentGameState) {
         case gameStates[0]:                 // Splash screen
             // TODO: Splash input
@@ -341,8 +390,8 @@ function DrawGame() {
 
 function DrawSplash() {
     backgroundCtx.clearRect(0, 0, width, height);
-    backgroundCtx.fillStyle = 'rgb(150, 0, 150)';
-    backgroundCtx.rect(50, 50, width-50, height-50);
+    backgroundCtx.fillStyle = 'rgba(150, 0, 150)';
+    backgroundCtx.fillRect(50, 50, width - 100, height - 100);
 }
 
 function DrawGameOver() {
@@ -372,15 +421,18 @@ function DrawCanvas() {
         backgroundCtx.drawImage(imgCrate, boxes[i].x, boxes[i].y, boxes[i].width, boxes[i].height);
     }
 
+    // Draw player
     if (isKeyPressed && currentGameState == gameStates[1]) {
         AnimationFrame();
+        foregroundCtx.save();
+        foregroundCtx.scale(-1, 1);
         foregroundCtx.drawImage(playerImg, spriteWidth * frameX, spriteHeight * frameY, spriteWidth, spriteHeight, player.x, player.y, player.width, player.height);
     } else
         foregroundCtx.drawImage(playerImg, spriteWidth * 2, spriteHeight * 1, spriteWidth, spriteHeight, player.x, player.y, player.width, player.height);
 }
 
 function DrawUI() {
-    UICtx.font = "30px Comic Sans MS";
+    UICtx.font = '30px "${Joystix}"';
     UICtx.fillStyle = "red";
     UICtx.textAlign = "center";
     UICtx.fillText("Hello World", 100, 20);
