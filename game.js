@@ -1,10 +1,9 @@
-var layer1;
-var layer2;
-var layer3;
+var debugActive = true;
+
 var city = new Image();
 var backgroundImg = new Image();
 
-var gameStates = ["Splash", "Game", "Pause", "GameOver"];
+var gameStates = ["Splash", "Game", "Pause", "GameOver", "Hiscore"];
 var currentGameState = gameStates[0];
 
 var RequestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
@@ -14,14 +13,28 @@ var mobilePlatform = false;
 // Set dimensions to fullscreen
 var width = window.innerWidth;
 var height = window.innerHeight;
+var screenScale = height / 1080;
 // Set layers z-index
-var background = document.getElementById("layer1");
-var canvas = document.getElementById("layer2");
-var UI = document.getElementById("layer3");
+var background = document.getElementById("layer1");     // Absolute background
+var back1 = document.getElementById("layer2");          // Parallax background 1
+var back2 = document.getElementById("layer3");          // Parallax background 2
+//var back3 = document.getElementById("layer4");        // Parallax background 3
+var canvas = document.getElementById("layer5");         // Foreground
+var UI = document.getElementById("layer6");             // UI
 // Set context by layers
 var backgroundCtx = background.getContext("2d");
 var foregroundCtx = canvas.getContext("2d");
 var UICtx = UI.getContext("2d");
+var contexts = [];
+
+// Splash screen values
+var splashPos = [width / 2, height / 2];
+var counter = 0;
+var pulseSpeed = 1.5;
+var pulseExtent = 20;
+var increase = Math.PI * pulseSpeed / 100;
+var selected = 0;
+var menuOptions = [];
 
 
 // Set window dimensions for all layers
@@ -35,6 +48,10 @@ UI.height = height;
 // Set background canvas dimensions
 backgroundCtx.canvas.width = width;   
 backgroundCtx.canvas.height = height;
+foregroundCtx.canvas.width = width;
+foregroundCtx.canvas.height = height;
+UICtx.canvas.width = width;
+UICtx.canvas.height = height;
 
 // Store current and previous frame keystates
 var keys = [];
@@ -45,7 +62,7 @@ var friction = 0.8;
 var objects = [];
 // PLAYER VARIABLES
 var player = {
-    x: width / 2,
+    x: width / 4,
     y: height / 2,
     width: 150,
     height: 150,
@@ -67,8 +84,10 @@ var frameTimeMax = 0.017;
 var spriteWidth = 74;
 var spriteHeight = 86;
 var playerImg = new Image();
-var speed = 5;
+var speed = 3;
 var isGrounded = true;
+
+var globalX = 0;
 
 
 var imgCrate = new Image();
@@ -134,14 +153,19 @@ function KeyUp(keycode) {
 
 
 function Initialise() {
+
     // Specify canvas dimensions
     canvas.width = width;
     canvas.height = height;
 
     // Load images from file
-    city.src = "city.png";
     backgroundImg.src = "background.png";
     imgCrate.src = "RTS_Crate_0.png";
+
+    menuOptions.length = 3;
+
+    globalX = player.x;
+    console.log("player pos" + globalX);
 
     boxes.push({
         x: 120,
@@ -185,7 +209,7 @@ function colCheck(shapeA, shapeB) {
     // If the distance between the objects is less than the minimum distance before collision on either axis, then a collision has occurred
     if (Math.abs(vX) < hWidths && Math.abs(vY) < hHeights) {
         // Figures out on which side we are colliding (top, bottom, left or right)
-        var oX = hWidths - Math.abs(vX),    // How far the objects are colliding within each other on X-axis        (overlap on X-axis)
+        var oX = hWidths - Math.abs(vX),     // How far the objects are colliding within each other on X-axis        (overlap on X-axis)
             oY = hHeights - Math.abs(vY);    // How far the objects are colliding within each other on the Y-axis    (overlap on Y-axis)
 
         if (oX >= oY) {             // Check if the object overlap is greater on the X-axis         (Collision more likely in direction with less overlap)
@@ -289,18 +313,20 @@ function PlayerControl() {
 
         }
         if (keys[68]) {                                         // D: Right
-            if (KeyDown(68)) {
-                console.log("pressed");
+            if (KeyDown(68))
                 player.facing = "right";
-            }
             if (player.x < (canvas.width - player.width - 20))
                 player.velX += speed;
+            else
+                player.velX = 0;
         }
         if (keys[65]) {                                         // A: Left
             if (KeyDown(65))
                 player.facing = "left";
             if (player.x > 0)
                 player.velX -= speed;
+            else
+                player.velX = 0;
         }
         if (keys[32] && !previousKeys[32] && isGrounded) {      // Space: Jump
             if (player.y > 0) {
@@ -312,13 +338,18 @@ function PlayerControl() {
 
     // Update player's x-position
     player.velX *= friction;
-    player.x += player.velX;
+    if (player.x < width / 2);
+        player.x += player.velX;
+
+    // Update the player's global X-position
+    globalX += player.velX;
+    console.log("compare player: " + player.x + " to global: " +globalX);
 }
 
 function ProcessInput() {
     switch (currentGameState) {
         case gameStates[0]:                 // Splash screen
-            // TODO: Splash input
+            SplashInput();
             break;
         case gameStates[1]:                 // Game screen
             PlayerControl();
@@ -333,44 +364,101 @@ function ProcessInput() {
             break;
     }
 
-    StateControl();
+    if (KeyDown(46))
+        debugActive = !debugActive;
+
+    if (debugActive)
+        StateControl();
 }
 
 function StateControl() {
-    if (keys[97]) {                                 // Splash
+    if (KeyDown(49)) {                                 // Splash
+        selected = 0;
+        menuOptions.length = 3;
         currentGameState = gameStates[0];
         console.log("State: " + currentGameState);
     }
-    if (keys[98]) {                                 // Game
+    if (KeyDown(50)) {                                 // Game
+        selected = 0;
         currentGameState = gameStates[1];
         console.log("State: " + currentGameState);
     }
-    if (keys[99]) {                                 // Pause
+    if (KeyDown(51)) {                                 // Pause
+        selected = 0;
         currentGameState = gameStates[2];
         console.log("State: " + currentGameState);
     }
-    if (keys[100]) {                                // Game over
+    if (KeyDown(52)) {                                // Game over
+        selected = 0;
         currentGameState = gameStates[3];
         console.log("State: " + currentGameState);
     }
 
 }
 
+function SplashInput() {
+    // MENU SELECTION
+    if (KeyDown(13)) {
+        console.log("Enter - selected: " + selected);
+        switch (selected) {
+            case 0: // Play
+                currentGameState = gameStates[1];
+                break;
+            case 1: // Hiscores
+                currentGameState[4];
+                break;
+            case 2:
+                break;
+            default:
+                break;
+        }
+    }
+    if (KeyDown(40)) {
+        if (selected + 1 >= menuOptions.length) {
+            selected = 0;
+            counter = 0;
+        }
+        else {
+            selected++;
+            counter = 0;
+        }
+        console.log("Selected: " + selected);
+    }
+    if (KeyDown(38)) {
+        if (selected - 1 < 0) {
+            selected = menuOptions.length - 1;
+            counter = 0;
+        }
+        else {
+            selected--;
+            counter = 0;
+        }
+        console.log("Selected: " + selected);
+    }
+}
+
+function UpdateGame() {
+    ApplyGravity();
+    CalculateCollisions();
+    DrawGame();
+}
+
+function UpdatePause() {
+    DrawPause();
+}
+
 function Update() {
     ProcessInput();
-
     // Determine state to update
     switch (currentGameState) {
         case gameStates[0]:                 // Splash
             DrawSplash();
             break;
         case gameStates[1]:                 // Game
-            ApplyGravity();
-            CalculateCollisions();
-            DrawGame();
+            UpdateGame();
             break;
         case gameStates[2]:                 // Pause
-            DrawPause();
+
             break;
         case gameStates[3]:                 // Game over
             DrawGameOver();
@@ -386,12 +474,67 @@ function Update() {
 function DrawGame() {
     DrawBackground();
     DrawCanvas();
+    DrawUI();
+}
+
+function AnimateMenuOptions() {
+    var logoMult = Math.sin(counter) / pulseExtent + 0.5;
+    counter += increase;
+
+    switch (currentGameState) {
+        case gameStates[0]:
+            // Option 1
+            if (selected == 0) {
+                DrawText("PLAY", (150 * logoMult) * screenScale, [splashPos[0] + 10, splashPos[1] + 10], "white", "white", 45, "center", "middle");
+                DrawText("PLAY", (150 * logoMult) * screenScale, [splashPos[0], splashPos[1]], "DarkTurquoise", "Black", 45, "center", "middle");
+                DrawText("PLAY", (150 * logoMult) * screenScale, [splashPos[0], splashPos[1]], "DarkTurquoise", "white", 20, "center", "middle");
+            }
+            else {
+                DrawText("PLAY", (65) * screenScale, [splashPos[0] + 10, splashPos[1] + 10], "white", "white", 45, "center", "middle");
+                DrawText("PLAY", (65) * screenScale, [splashPos[0], splashPos[1]], "DarkTurquoise", "Black", 45, "center", "middle");
+                DrawText("PLAY", (65) * screenScale, [splashPos[0], splashPos[1]], "DarkTurquoise", "white", 20, "center", "middle");
+            }
+            // Option 2
+            if (selected == 1) {
+                DrawText("OPTION2", (150 * logoMult) * screenScale, [splashPos[0] + 10, splashPos[1] + 100 + 10], "white", "white", 45, "center", "middle");
+                DrawText("OPTION2", (150 * logoMult) * screenScale, [splashPos[0], splashPos[1] + 100], "DarkTurquoise", "Black", 45, "center", "middle");
+                DrawText("OPTION2", (150 * logoMult) * screenScale, [splashPos[0], splashPos[1] + 100], "DarkTurquoise", "white", 20, "center", "middle");
+            }
+            else {
+                DrawText("OPTION2", (65) * screenScale, [splashPos[0] + 10, splashPos[1] + 100 + 10], "white", "white", 45, "center", "middle");
+                DrawText("OPTION2", (65) * screenScale, [splashPos[0], splashPos[1] + 100], "DarkTurquoise", "Black", 45, "center", "middle");
+                DrawText("OPTION2", (65) * screenScale, [splashPos[0], splashPos[1] + 100], "DarkTurquoise", "white", 20, "center", "middle");
+            }
+            // Option 3
+            if (selected == 2) {
+                DrawText("OPTION3", (150 * logoMult) * screenScale, [splashPos[0] + 10, splashPos[1] + 200 + 10], "white", "white", 45, "center", "middle");
+                DrawText("OPTION3", (150 * logoMult) * screenScale, [splashPos[0], splashPos[1] + 200], "DarkTurquoise", "Black", 45, "center", "middle");
+                DrawText("OPTION3", (150 * logoMult) * screenScale, [splashPos[0], splashPos[1] + 200], "DarkTurquoise", "white", 20, "center", "middle");
+            }
+            else {
+                DrawText("OPTION3", (65) * screenScale, [splashPos[0] + 10, splashPos[1] + 200 + 10], "white", "white", 45, "center", "middle");
+                DrawText("OPTION3", (65) * screenScale, [splashPos[0], splashPos[1] + 200], "DarkTurquoise", "Black", 45, "center", "middle");
+                DrawText("OPTION3", (65) * screenScale, [splashPos[0], splashPos[1] + 200], "DarkTurquoise", "white", 20, "center", "middle");
+            }
+            break;
+        case gameStates[1]:
+            break;
+        case gameStates[2]:
+            break;
+        case gameStates[3]:
+            break;
+        default:
+            break;
+    }
 }
 
 function DrawSplash() {
+    UICtx.clearRect(0, 0, width, height);
     backgroundCtx.clearRect(0, 0, width, height);
-    backgroundCtx.fillStyle = 'rgba(150, 0, 150)';
+    backgroundCtx.fillStyle = 'rgba(100, 100, 100)';
     backgroundCtx.fillRect(50, 50, width - 100, height - 100);
+    DrawText("TEST", 150, [width / 2, 100], "white", "black", 35, "center", "top");
+    AnimateMenuOptions();
 }
 
 function DrawGameOver() {
@@ -424,18 +567,37 @@ function DrawCanvas() {
     // Draw player
     if (isKeyPressed && currentGameState == gameStates[1]) {
         AnimationFrame();
-        foregroundCtx.save();
-        foregroundCtx.scale(-1, 1);
         foregroundCtx.drawImage(playerImg, spriteWidth * frameX, spriteHeight * frameY, spriteWidth, spriteHeight, player.x, player.y, player.width, player.height);
     } else
         foregroundCtx.drawImage(playerImg, spriteWidth * 2, spriteHeight * 1, spriteWidth, spriteHeight, player.x, player.y, player.width, player.height);
 }
 
 function DrawUI() {
-    UICtx.font = '30px "${Joystix}"';
-    UICtx.fillStyle = "red";
-    UICtx.textAlign = "center";
-    UICtx.fillText("Hello World", 100, 20);
+    UICtx.clearRect(0, 0, width, height);
+    var text = "Hello World";
+    DrawText(text, 30, [width/2,height/2], "white", "black", 8, "top");
+    //UICtx.clearRect(0, 0, width, height);
+    //UICtx.font = '30px "Joystix"';
+    //UICtx.strokeStyle = 'black';
+    //UICtx.lineWidth = 8;
+    //UICtx.strokeText(text, 0, 0);
+    //UICtx.fillStyle = 'white';
+    //UICtx.textBaseline = 'top';
+    //UICtx.fillText(text, 0, 0);
 
     playerImg.src = 'braidSpriteSheet.png';
+}
+
+function DrawText(text, size, pos, fillCol, strokeCol, strokeWidth, align, baseline) {
+    //UICtx.clearRect(0, 0, width, height);
+    UICtx.font = '' + size + 'px "Joystix"';
+    UICtx.textAlign = align;
+    UICtx.strokeStyle = strokeCol;
+    UICtx.lineWidth = strokeWidth;
+    UICtx.textBaseline = baseline;
+    UICtx.strokeText(text, pos[0], pos[1]);
+    UICtx.fillStyle = fillCol;
+    UICtx.textBaseline = baseline;
+    UICtx.fillText(text, pos[0], pos[1]);
+
 }
