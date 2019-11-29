@@ -10,3 +10,7 @@ body {
     src: local('Joystix'), 
         url(Joystix.ttf) format('truetype');
 }
+canvas {
+    image-rendering: -moz-crisp-edges;
+    image-rendering: pixelated;
+}
