@@ -69,24 +69,42 @@ let playerInit = {                      // Player object
     velX: 0,                        // Player velocity: X
     velY: 0,                        //                : Y
     facing: "right",                // Indicates current facing
-    isGrounded: false
+    isGrounded: false,
+    isShooting: false,
+    isAnimating: true,
+    sprite: "",
+    startTimeMS: 0,
+    frameX: 0,
+    frameXMax: 2,
+    frameY: 0,
+    frameYMax: 2,
+    frame: 0,
+    frameMax: 7
 };
+var bullet = {
+    x: -100,
+    y: -100,
+    velX: 0,
+    velY: 0
+}
+var playerBullets = [];
+var enemyBullets = [];
 let player = Object.assign({}, playerInit);
 var friction = 0.8;                 // Rate at which velocity decreases
 var score = 0;
 // -Animation
-var startTimeMS = 0;
-var frameX = 0;
-var frameXMax = 7;
-var frameY = 0;
-var frameYMax = 0;
-var frame = 0;
-var frameMax = 7;
+//var startTimeMS = 0;
+//var frameX = 0;
+//var frameXMax = 2;
+//var frameY = 0;
+//var frameYMax = 2;
+//var frame = 0;
+//var frameMax = 7;
 var frameTimer = 0.05;
-var frameTimeMax = 0.05;
+var frameTimeMax = 0.065;
 // -Sprite
-var spriteWidth = 41;
-var spriteHeight = 41;
+var spriteWidth = 81;
+var spriteHeight = 77;
 var playerImg = new Image();
 var speed = 4;
 
@@ -110,17 +128,13 @@ window.addEventListener("load", function () {
 // Set keydown
 document.body.addEventListener("keydown", function (e) {
     keys[e.keyCode] = true;
-    if (e.keyCode == 65 || e.keyCode == 68 || e.keyCode == 38 || e.keyCode == 37) {
-        isAnimating = true;
-    }
+    console.log("Key: " + e.keyCode + " " + keys[e.keyCode]);
 });
 
 // Set keyup
 document.body.addEventListener("keyup", function (e) {
     keys[e.keyCode] = false;
-    if (e.keyCode == 65 || e.keyCode == 68 || e.keyCode == 38 || e.keyCode == 37) {
-        isAnimating = false;
-    }
+    console.log("Key: " + e.keyCode + " " + keys[e.keyCode]);
 });
 
 function DetectMobile() {
@@ -154,13 +168,42 @@ function KeyUp(keycode) {
         return false;
 }
 
+function SetPlayerSprite(sprite) {
+    playerImg.src = "assets/player/" + sprite + ".png";
+    player.sprite = sprite;
+    player.frameX = 0;
+    player.frameY = 0;
+    player.frame = 0;
+
+    if (sprite == "runRight" || sprite == "runLeft") {
+        player.frameMax = 7;
+        player.frameXMax = 2;
+        player.frameYMax = 2;
+    }
+    else if (sprite == "idleLeft" || sprite == "idleRight") {
+        player.frameMax = 3;
+        player.frameXMax = 1;
+        player.frameYMax = 1;
+    }
+    else if (sprite == "runShootRight" || sprite == "runShootLeft") {
+        player.frameMax = 7;
+        player.frameXMax = 2;
+        player.frameYMax = 2;
+    }
+    else if (sprite == "shootRight" || sprite == "shootLeft") {
+        player.frameMax = 0;
+        player.frameXMax = 0;
+        player.frameYMax = 0;
+    }
+}
+
 
 function Initialise() {
 
     // Load images from file
     backgroundImg.src = "background.png";
     imgCrate.src = "RTS_Crate_0.png";
-    playerImg.src = 'assets/player/runRight.png';
+    SetPlayerSprite("runRight");
 
     // Initialise menu options length to number of splash screen options
     menuOptions.length = numOptions[0];
@@ -235,29 +278,29 @@ function colCheck(shapeA, shapeB) {
     return colDir;                  // Return the collision direction
 }
 
-function AnimationFrame() {
-    var elapsed = (Date.now() - startTimeMS) / 1000;
-    startTimeMS = Date.now();
+function AnimationFrame(object) {
+    var elapsed = (Date.now() - object.startTimeMS) / 1000;
+    object.startTimeMS = Date.now();
 
     //only update frames when timer is below 0
     frameTimer = frameTimer - elapsed;
     if (frameTimer <= 0) {
         frameTimer = frameTimeMax;
-        frameX++;
-        if (frameX > frameXMax) {
-            frameX = 0;
-            frameY++;
+        object.frameX++;
+        if (object.frameX > object.frameXMax) {
+            object.frameX = 0;
+            object.frameY++;
             //end of row, move down to next row in sheet
-            if (frameY > frameYMax) {
-                frameY = 0;
+            if (object.frameY > object.frameYMax) {
+                object.frameY = 0;
             }
         }
-        frame++;
+        object.frame++;
         // Reset frames to 0 if empty spaces on sprite sheet
-        if (frame > frameMax) {
-            frame = 0;
-            frameX = 0;
-            frameY = 0;
+        if (object.frame > object.frameMax) {
+            object.frame = 0;
+            object.frameX = 0;
+            object.frameY = 0;
         }
     }
 
@@ -306,6 +349,10 @@ function PlayerControl() {
         // TODO: Mobile input
     }
     else {                                                      // PC Input Handler
+        if (keys[13])
+            player.isShooting = true;
+        else
+            player.isShooting = false;
         if (keys[83] && player.isGrounded) {                    // S: Down
             if (player.y < (canvas.height - player.height - 20))
                 player.velY += speed;
@@ -314,25 +361,67 @@ function PlayerControl() {
 
         }
         if (keys[68]) {                                         // D: Right
-            if (KeyDown(68)) {
+            if (player.isGrounded) {
                 player.facing = "right";
-                playerImg.src = 'assets/player/runRight.png';
+                if (player.isShooting) {
+                    if (player.sprite != "runShootRight")
+                        SetPlayerSprite("runShootRight");
+                }
+                else if (player.sprite != "runRight")
+                    SetPlayerSprite("runRight");
+                if (player.x < (width) - player.width)
+                    player.velX += speed;
+                else
+                    player.velX = 0;
+                console.log("player x: " + player.x + ", width x: " + width/2);
             }
-            if (player.x < (canvas.width - player.width - 20))
-                player.velX += speed;
-            else
-                player.velX = 0;
+            console.log(player.isShooting);
         }
         if (keys[65]) {                                         // A: Left
-            if (KeyDown(65)) {
+            if (player.isGrounded) {
                 player.facing = "left";
-                playerImg.src = 'assets/player/runLeft.png';
+                if (player.isShooting) {
+                    if (player.sprite != "runShootLeft")
+                        SetPlayerSprite("runShootLeft");
+                }
+                else if (player.sprite != "runLeft")
+                    SetPlayerSprite("runLeft");
+                if (player.x > 0)
+                    player.velX -= speed;
+                else
+                    player.velX = 0;
             }
-            if (player.x > 0)
-                player.velX -= speed;
-            else
-                player.velX = 0;
         }
+        if (!keys[68] && !keys[65]) {
+            if (player.isShooting) {
+                if (player.isGrounded) {
+                    if (player.facing == "right") {
+                        var sprite = "shootRight";
+                        if (player.sprite != sprite) {
+                            SetPlayerSprite(sprite);
+                            console.log("set");
+                        }
+                    }
+                    else {
+                        var sprite = "shootLeft"
+                        if (player.sprite != sprite)
+                            SetPlayerSprite(sprite);
+                    }
+                }
+            }
+            else {
+                if (player.isGrounded)
+                    if (player.facing == "right") {
+                        if (player.sprite != "idleRight")
+                            SetPlayerSprite("idleRight");
+                    }
+                    else {
+                        if (player.sprite != "idleLeft")
+                            SetPlayerSprite("idleLeft");
+                    }
+            }
+        }
+
         if (keys[32] && !previousKeys[32] && player.isGrounded) { // Space: Jump
             if (player.y > 0) {
                 player.velY -= 30;
@@ -342,9 +431,10 @@ function PlayerControl() {
     }
 
     // Update player's x-position
-    player.velX *= friction;
-    if (player.x < width / 2);
-        player.x += player.velX;
+    if (player.isGrounded)
+        player.velX *= friction;
+
+    player.x += player.velX;
 
     // TODO: Update the player's global X-position
     globalX += player.velX;
@@ -362,11 +452,11 @@ function ResetLevel() {
     player.velY = playerInit.velY;
     player.facing = playerInit.facing;
     player.isGrounded = playerInit.isGrounded;
-    //player = Object.assign({}, playerInit);
+    player.isShooting = playerInit.isShooting;
     if (player.facing == "right")
-        playerImg.src = 'assets/player/runRight.png';
+        SetPlayerSprite("runRight");
     else
-        playerImg.src = 'assets/player/runLeft.png';
+        SetPlayerSprite("runLeft");
     score = 0;
 }
 
@@ -479,7 +569,7 @@ function SplashInput() {
         console.log("Enter - selected: " + selected);
         switch (selected) {
             case 0: // Play
-                currentGameState = GAMESTATES[1];
+                ChangeState(1);
                 break;
             case 1: // Hiscores
                 currentGameState[4];
@@ -548,6 +638,25 @@ function DrawMenuText(text, sizeSelected, sizeUnselected, pos, spacing, fillCol,
 }
 
 function ChangeState(state) {
+    switch (state) {
+        case 0:
+            isAnimating = false;
+            break;
+        case 1:
+            isAnimating = true;
+            break;
+        case 2:
+            isAnimating = false;
+            break;
+        case 3:
+            isAnimating = false;
+            break;
+        case 4:
+            isAnimating = false;
+            break;
+        default:
+            break;
+    }
     selected = 0;
     counter = 0;
     menuOptions.length = numOptions[state];
@@ -621,11 +730,9 @@ function DrawCanvas() {
     }
 
     // Draw player
-    if (isAnimating && currentGameState == GAMESTATES[1]) {
-        AnimationFrame();
-        foregroundCtx.drawImage(playerImg, spriteWidth * frameX, spriteHeight * frameY, spriteWidth, spriteHeight, player.x, player.y, player.width * screenScale, player.height * screenScale);
-    } else
-        foregroundCtx.drawImage(playerImg, spriteWidth * 0, spriteHeight * 0, spriteWidth, spriteHeight, player.x, player.y, player.width * screenScale, player.height * screenScale);
+    if (isAnimating)
+        AnimationFrame(player);
+    foregroundCtx.drawImage(playerImg, spriteWidth * player.frameX, spriteHeight * player.frameY, spriteWidth, spriteHeight, player.x, player.y, player.width * screenScale, player.height * screenScale);
 }
 
 function DrawUI() {
