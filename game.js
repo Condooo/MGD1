@@ -103,8 +103,8 @@ var score = 0;
 var frameTimer = 0.05;
 var frameTimeMax = 0.065;
 // -Sprite
-var spriteWidth = 81;
-var spriteHeight = 77;
+var spriteWidth = 71;
+var spriteHeight = 67;
 var playerImg = new Image();
 var speed = 4;
 
@@ -316,8 +316,8 @@ function CalculateCollisions() {
         player.y = 0;
         player.velY = 0;
     }
-    if (player.y > (height - player.height)) {  // Bottom edge
-        player.y = (height - player.height);
+    if (player.y > (height - player.height * screenScale)) {  // Bottom edge
+        player.y = (height - player.height * screenScale);
         player.velY = 0;
         player.isGrounded = true;
     }
@@ -349,12 +349,13 @@ function PlayerControl() {
         // TODO: Mobile input
     }
     else {                                                      // PC Input Handler
-        if (keys[13])
+        if (keys[13]) {
             player.isShooting = true;
+        }
         else
             player.isShooting = false;
         if (keys[83] && player.isGrounded) {                    // S: Down
-            if (player.y < (canvas.height - player.height - 20))
+            if (player.y < (canvas.height - player.height))
                 player.velY += speed;
         }
         if (keys[87]) {                                         // W: Up
