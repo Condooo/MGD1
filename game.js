@@ -2,6 +2,8 @@ var debugActive = true;
 
 var city = new Image();
 var backgroundImg = new Image();
+var skylineImg = new Image();
+
 
 var GAMESTATES = ["Splash", "Game", "Pause", "GameOver", "Hiscore"];    // Store the available gamestates
 var currentGameState = GAMESTATES[0];                                   // Store and assign the currently selected gamestate
@@ -25,6 +27,8 @@ var UI = document.getElementById("layer6");             // UI
 var backgroundCtx = background.getContext("2d");        // Background layer
 var foregroundCtx = canvas.getContext("2d");            // Gameplay layer
 var UICtx = UI.getContext("2d");                        // UI layer
+var scrollSpeed = 5;                                    // Screen scroll speed
+var backgroundScroll = [];
 
 // Splash screen values
 var splashPos = [width / 2, height / 2];                // Set position for splash screen menu text
@@ -103,8 +107,8 @@ var score = 0;
 var frameTimer = 0.05;
 var frameTimeMax = 0.065;
 // -Sprite
-var spriteWidth = 71;
-var spriteHeight = 67;
+var spriteWidth = 199;
+var spriteHeight = 188;
 var playerImg = new Image();
 var speed = 4;
 
@@ -202,8 +206,22 @@ function Initialise() {
 
     // Load images from file
     backgroundImg.src = "background.png";
+    skylineImg.src = "skyline-a.png";
     imgCrate.src = "RTS_Crate_0.png";
     SetPlayerSprite("runRight");
+
+    for (var i = 0; i < 6; i++) {
+        backgroundScroll.push({
+            x: i * (469 * screenScale),
+            y: 0
+        });
+    }
+    for (var i = 0; i < backgroundScroll.length; i++) {
+        objects.push(backgroundScroll[i]);
+    }
+    console.log(skylineImg.width);
+
+    console.log("window: " + window.innerHeight + " img: " + skylineImg.height);
 
     // Initialise menu options length to number of splash screen options
     menuOptions.length = numOptions[0];
@@ -231,7 +249,6 @@ function Initialise() {
     // Add all boxes to objects array
     for (var i = 0; i < boxes.length; i++) {
         objects.push(boxes[i]);
-        console.log("Object: " + i + " " + objects[i].x);
     }
     objects.push(player);
 
@@ -308,8 +325,10 @@ function AnimationFrame(object) {
 
 function CalculateCollisions() {
     // Screen edge collision
-    if (player.x < 0)                           // Left edge
+    if (player.x <= 0)                           // Left edge
+    {
         player.x = 0;
+    }
     if (player.x > (width - player.width))      // Right edge
         player.x = (width - player.width);
     if (player.y < 0) {                         // Top edge
@@ -341,6 +360,7 @@ function ApplyGravity() {
     for (var i = 0; i < objects.length; i++) {
         objects[i].velY += 1;
         objects[i].y += objects[i].velY;
+        objects[i].x -= scrollSpeed;
     }
 }
 
@@ -396,25 +416,34 @@ function PlayerControl() {
         if (!keys[68] && !keys[65]) {
             if (player.isShooting) {
                 if (player.isGrounded) {
-                    if (player.facing == "right") {
-                        var sprite = "shootRight";
-                        if (player.sprite != sprite) {
-                            SetPlayerSprite(sprite);
-                            console.log("set");
+                    if (player.x > 0) {
+                        if (player.facing == "right") {
+                            var sprite = "shootRight";
+                            if (player.sprite != sprite) {
+                                SetPlayerSprite(sprite);
+                                console.log("set");
+                            }
+                        }
+                        else {
+                            var sprite = "shootLeft"
+                            if (player.sprite != sprite)
+                                SetPlayerSprite(sprite);
                         }
                     }
-                    else {
-                        var sprite = "shootLeft"
-                        if (player.sprite != sprite)
-                            SetPlayerSprite(sprite);
-                    }
+                    else if (player.sprite != "runShootRight")
+                        SetPlayerSprite("runShootRight");
                 }
             }
             else {
                 if (player.isGrounded)
                     if (player.facing == "right") {
-                        if (player.sprite != "idleRight")
-                            SetPlayerSprite("idleRight");
+                        if (player.x > 0) {
+                            if (player.sprite != "idleRight")
+                                SetPlayerSprite("idleRight");
+                        }
+                        else if (player.sprite != "runRight")
+                            SetPlayerSprite("runRight");
+
                     }
                     else {
                         if (player.sprite != "idleLeft")
@@ -586,7 +615,21 @@ function SplashInput() {
 function UpdateGame() {
     ApplyGravity();
     CalculateCollisions();
+    ScrollBackground();
     DrawGame();
+}
+
+function ScrollBackground() {
+    for (var i = 0; i < backgroundScroll.length; i++) {
+        if (backgroundScroll[i].x < (skylineImg.width * screenScale * -1)) {
+            backgroundScroll.splice(0, 1);
+            backgroundScroll.push({
+                x: backgroundScroll[backgroundScroll.length - 1].x + skylineImg.width * screenScale,
+                y: 0
+            });
+            objects.push(backgroundScroll[backgroundScroll.length - 1]);
+        }
+    }
 }
 
 function Update() {
@@ -718,7 +761,9 @@ function DrawPause(logoMult) {
 
 function DrawBackground() {
     backgroundCtx.clearRect(0, 0, width, height);
-    backgroundCtx.drawImage(backgroundImg, 0, 0, width, height);
+    for (var i = 0; i < backgroundScroll.length; i++) {
+        backgroundCtx.drawImage(skylineImg, backgroundScroll[i].x, 0, skylineImg.width * screenScale, skylineImg.height * screenScale);
+    }
 }
 
 function DrawCanvas() {
