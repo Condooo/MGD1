@@ -1,8 +1,6 @@
 var debugActive = true;
 
 var city = new Image();
-var backgroundImg = new Image();
-var skylineImg = new Image();
 
 
 var GAMESTATES = ["Splash", "Game", "Pause", "GameOver", "Hiscore"];    // Store the available gamestates
@@ -27,8 +25,17 @@ var UI = document.getElementById("layer6");             // UI
 var backgroundCtx = background.getContext("2d");        // Background layer
 var foregroundCtx = canvas.getContext("2d");            // Gameplay layer
 var UICtx = UI.getContext("2d");                        // UI layer
+
+// Parallax background
+var backgroundImg = new Image();
+var backgroundImg2 = new Image();
+var backgroundIndex = 0;
+var midgroundImg = new Image();
+var foregroundImg = new Image();
 var scrollSpeed = 5;                                    // Screen scroll speed
-var backgroundScroll = [];
+var backgroundScroll = [];                              // Parallax background planes
+var midgroundScroll = [];
+var foregroundScroll = [];
 
 // Splash screen values
 var splashPos = [width / 2, height / 2];                // Set position for splash screen menu text
@@ -72,6 +79,7 @@ let playerInit = {                      // Player object
     height: 200,                    //                  : height
     velX: 0,                        // Player velocity: X
     velY: 0,                        //                : Y
+    health: 3,
     facing: "right",                // Indicates current facing
     isGrounded: false,
     isShooting: false,
@@ -83,14 +91,38 @@ let playerInit = {                      // Player object
     frameY: 0,
     frameYMax: 2,
     frame: 0,
-    frameMax: 7
+    frameMax: 7,
+    shotTimer: 0,
+    shootTimerMax: 20,
+    tag: "player",
+    spriteWidth: 199,
+    spriteHeight: 188,
+    frameTimer: 0.05,
+    frameTimeMax: 0.065
 };
+var maxShotTime = 50;
 var bullet = {
-    x: -100,
-    y: -100,
+    x: 0,
+    y: 0,
     velX: 0,
-    velY: 0
+    velY: 0,
+    width: 42,
+    height: 31,
+    speed: 20,
+    spriteWidth: 42,
+    spriteHeight: 31,
+    startTimeMS: 0,
+    frameX: 0,
+    frameXMax: 1,
+    frameY: 0,
+    frameYMax: 1,
+    frame: 0,
+    frameMax: 3,
+    frameTimer: 0.05,
+    frameTimeMax: 0.065
 }
+var bulletImg = new Image();
+var enemies = [];
 var playerBullets = [];
 var enemyBullets = [];
 let player = Object.assign({}, playerInit);
@@ -104,8 +136,8 @@ var score = 0;
 //var frameYMax = 2;
 //var frame = 0;
 //var frameMax = 7;
-var frameTimer = 0.05;
-var frameTimeMax = 0.065;
+//var frameTimer = 0.05;
+//var frameTimeMax = 0.065;
 // -Sprite
 var spriteWidth = 199;
 var spriteHeight = 188;
@@ -132,13 +164,11 @@ window.addEventListener("load", function () {
 // Set keydown
 document.body.addEventListener("keydown", function (e) {
     keys[e.keyCode] = true;
-    console.log("Key: " + e.keyCode + " " + keys[e.keyCode]);
 });
 
 // Set keyup
 document.body.addEventListener("keyup", function (e) {
     keys[e.keyCode] = false;
-    console.log("Key: " + e.keyCode + " " + keys[e.keyCode]);
 });
 
 function DetectMobile() {
@@ -178,6 +208,7 @@ function SetPlayerSprite(sprite) {
     player.frameX = 0;
     player.frameY = 0;
     player.frame = 0;
+    player.tag = "player";
 
     if (sprite == "runRight" || sprite == "runLeft") {
         player.frameMax = 7;
@@ -205,23 +236,46 @@ function SetPlayerSprite(sprite) {
 function Initialise() {
 
     // Load images from file
-    backgroundImg.src = "background.png";
-    skylineImg.src = "skyline-a.png";
+    backgroundImg.src = "skyline-a.png";
+    backgroundImg2.src = "skyline-b.png";
+    midgroundImg.src = "midground.png";
+    foregroundImg.src = "foreground.png";
+
+    bulletImg.src = "assets/player/bullet.png";
+
     imgCrate.src = "RTS_Crate_0.png";
     SetPlayerSprite("runRight");
 
-    for (var i = 0; i < 6; i++) {
+    // Parallax: Background
+    for (var i = 0; i < 7; i++) {
         backgroundScroll.push({
             x: i * (469 * screenScale),
-            y: 0
+            y: 0,
+            image: backgroundImg
         });
     }
-    for (var i = 0; i < backgroundScroll.length; i++) {
-        objects.push(backgroundScroll[i]);
+    // Parallax: Midground
+    for (var i = 0; i < 7; i++) {
+        midgroundScroll.push({
+            x: i * (469 * screenScale),
+            y: 0,
+            image: midgroundImg
+        });
     }
-    console.log(skylineImg.width);
+    // Parallax: Foreground
+    for (var i = 0; i < 7; i++) {
+        foregroundScroll.push({
+            x: i * (986 * screenScale),
+            y: 0,
+            image: foregroundImg
+        });
+    }
 
-    console.log("window: " + window.innerHeight + " img: " + skylineImg.height);
+    //for (var i = 0; i < backgroundScroll.length; i++) {
+    //    objects.push(backgroundScroll[i]);
+    //}
+
+    console.log("window: " + window.innerHeight + " img: " + backgroundImg.height);
 
     // Initialise menu options length to number of splash screen options
     menuOptions.length = numOptions[0];
@@ -235,7 +289,8 @@ function Initialise() {
         width: 200,
         height: 200,
         velX: 0,
-        velY: 0
+        velY: 0,
+        tag: "box"
     });
     boxes.push({
         x: 500,
@@ -243,7 +298,8 @@ function Initialise() {
         width: 200,
         height: 200,
         velX: 0,
-        velY: 0
+        velY: 0,
+        tag: "box"
     });
 
     // Add all boxes to objects array
@@ -251,8 +307,6 @@ function Initialise() {
         objects.push(boxes[i]);
     }
     objects.push(player);
-
-    
 
 
     DrawUI();
@@ -300,9 +354,9 @@ function AnimationFrame(object) {
     object.startTimeMS = Date.now();
 
     //only update frames when timer is below 0
-    frameTimer = frameTimer - elapsed;
-    if (frameTimer <= 0) {
-        frameTimer = frameTimeMax;
+    object.frameTimer = object.frameTimer - elapsed;
+    if (object.frameTimer <= 0) {
+        object.frameTimer = object.frameTimeMax;
         object.frameX++;
         if (object.frameX > object.frameXMax) {
             object.frameX = 0;
@@ -353,6 +407,19 @@ function CalculateCollisions() {
             player.isGrounded = true;
         }
     }
+    // Player bullet collision
+    for (var i = 0; i < playerBullets.length; i++) {
+        for (var j = 0; j < enemies.length; j++) {
+            var dir = colCheck(enemies[j], playerBullets[i]);
+            if (dir != null)
+                DestroyEnemy(j, i);
+        }
+    }
+}
+
+function DestroyEnemy(enemyIndex, bulletIndex) {
+    enemies.splice(enemyIndex, 1);
+    playerBullets.splice(bulletIndex, 1);
 }
 
 // Apply gravity to all objects stored in objects array
@@ -394,9 +461,7 @@ function PlayerControl() {
                     player.velX += speed;
                 else
                     player.velX = 0;
-                console.log("player x: " + player.x + ", width x: " + width/2);
             }
-            console.log(player.isShooting);
         }
         if (keys[65]) {                                         // A: Left
             if (player.isGrounded) {
@@ -421,7 +486,6 @@ function PlayerControl() {
                             var sprite = "shootRight";
                             if (player.sprite != sprite) {
                                 SetPlayerSprite(sprite);
-                                console.log("set");
                             }
                         }
                         else {
@@ -436,18 +500,15 @@ function PlayerControl() {
             }
             else {
                 if (player.isGrounded)
-                    if (player.facing == "right") {
-                        if (player.x > 0) {
-                            if (player.sprite != "idleRight")
-                                SetPlayerSprite("idleRight");
+                    if (player.x > 0) {
+                        if (player.sprite != "idleRight") {
+                            SetPlayerSprite("idleRight");
+                            player.facing = "right";
                         }
-                        else if (player.sprite != "runRight")
-                            SetPlayerSprite("runRight");
-
                     }
-                    else {
-                        if (player.sprite != "idleLeft")
-                            SetPlayerSprite("idleLeft");
+                    else if (player.sprite != "runRight") {
+                        SetPlayerSprite("runRight");
+                        player.facing = "right";
                     }
             }
         }
@@ -470,9 +531,88 @@ function PlayerControl() {
     globalX += player.velX;
 }
 
+function Generate(object) {
+    switch (object) {
+        case "bullet":
+            playerBullets.push(bullet);
+            var bulletData = {
+                y: player.y + (player.height / 3) * screenScale - (7 * screenScale),
+                x: player.x + player.width - (65 * screenScale),
+                frameX: bullet.frameX,
+                frameY: bullet.frameY,
+                frame: bullet.frame,
+                velX: bullet.speed,
+                width: bullet.width,
+                height: bullet.height,
+                spriteWidth: bullet.spriteWidth,
+                spriteHeight: bullet.spriteHeight,
+                startTimeMS: bullet.startTimeMS,
+                frameXMax: bullet.frameXMax,
+                frameYMax: bullet.frameYMax,
+                frameMax: bullet.frameMax,
+                frameTimer: bullet.frameTimer,
+                frameTimeMax: bullet.frameTimeMax
+            }
+            playerBullets[playerBullets.length - 1] = Object.assign({}, bulletData);
+            player.shootTimer = 0;
+            player.shootTimer -= player.shootTimer;
+            break;
+        case "enemy":
+            break;
+        default:
+            break;
+    }
+}
+
 function GameInput() {
     if (KeyDown(27))
         ChangeState(2);
+    if (KeyDown(13)) {
+        Generate("bullet");
+    }
+    if (keys[13]) {
+        if (player.shootTimer > player.shootTimerMax) {
+            Generate("bullet");
+        }
+
+    }
+        //playerBullets[playerBullets.length - 1].frameX = 0;
+        //playerBullets[playerBullets.length - 1].frameY = 0;
+        //playerBullets[playerBullets.length - 1].frame = 0;
+        //playerBullets[playerBullets.length - 1].velX = 20;
+
+        //playerBullets[playerBullets.length - 1].width = 42;
+        //playerBullets[playerBullets.length - 1].height = 31;
+        //playerBullets[playerBullets.length - 1].spriteWidth = 42;
+        //playerBullets[playerBullets.length - 1].spriteHeight = 31;
+        //playerBullets[playerBullets.length - 1].startTimeMS = 0;
+
+        //playerBullets[playerBullets.length - 1].frameXMax = 1;
+
+        //playerBullets[playerBullets.length - 1].frameYMax = 1;
+
+        //playerBullets[playerBullets.length - 1].frameMax = 3;
+        //playerBullets[playerBullets.length - 1].frameTimer = 0.05;
+        //playerBullets[playerBullets.length - 1].frameTimeMax = 0.065;
+
+        //console.log(playerBullets.length);
+        //console.log("x: " + playerBullets[playerBullets.length - 1].x + " y: " + playerBullets[playerBullets.length - 1].y);
+
+        console.log(playerBullets[playerBullets.length - 1]);
+        console.log(playerBullets.length);
+
+        //playerBullets[playerBullets.length - 1].velX= 0;
+        //playerBullets[playerBullets.length - 1].velY = 0;
+        //playerBullets[playerBullets.length - 1].width= 42;
+        //playerBullets[playerBullets.length - 1].height = 31;
+        //playerBullets[playerBullets.length - 1].spriteWidth = 42;
+        //playerBullets[playerBullets.length - 1].spriteHeight = 31;
+        //playerBullets[playerBullets.length - 1].startTimeMS = 0;
+        //playerBullets[playerBullets.length - 1].frameYMax = 1;
+        //playerBullets[playerBullets.length - 1].frameMax = 3;
+        //playerBullets[playerBullets.length - 1].frameTimer = 0.05;
+        //playerBullets[playerBullets.length - 1].frameTimeMax = 0.065;
+    
 }
 
 function ResetLevel() {
@@ -554,7 +694,6 @@ function MenuNavigation() {
             selected++;
             counter = 0;
         }
-        console.log("Selected: " + selected);
     }
     if (KeyDown(38)) {
         if (selected - 1 < 0) {
@@ -565,7 +704,6 @@ function MenuNavigation() {
             selected--;
             counter = 0;
         }
-        console.log("Selected: " + selected);
     }
 }
 
@@ -574,29 +712,24 @@ function StateControl() {
         selected = 0;
         menuOptions.length = 3;
         currentGameState = GAMESTATES[0];
-        console.log("State: " + currentGameState);
     }
     if (KeyDown(50)) {                                 // Game
         selected = 0;
         currentGameState = GAMESTATES[1];
-        console.log("State: " + currentGameState);
     }
     if (KeyDown(51)) {                                 // Pause
         selected = 0;
         currentGameState = GAMESTATES[2];
-        console.log("State: " + currentGameState);
     }
     if (KeyDown(52)) {                                // Game over
         selected = 0;
         currentGameState = GAMESTATES[3];
-        console.log("State: " + currentGameState);
     }
 }
 
 function SplashInput() {
     // MENU SELECTION
     if (KeyDown(13)) {
-        console.log("Enter - selected: " + selected);
         switch (selected) {
             case 0: // Play
                 ChangeState(1);
@@ -612,22 +745,75 @@ function SplashInput() {
     }
 }
 
-function UpdateGame() {
+function UpdateBullets() {
+    for (var i = 0; i < playerBullets.length; i++) {
+        playerBullets[i].x += playerBullets[i].velX;
+        if (playerBullets[i].x > width)
+            playerBullets.splice(i, 1);
+
+    }
+    if (playerBullets.length > 0)
+        player.shootTimer++;
+}
+
+function UpdateObjects() {
     ApplyGravity();
+    UpdateBullets();
+}
+
+function UpdateGame() {
+    UpdateObjects();
     CalculateCollisions();
-    ScrollBackground();
+    ScrollBackground(scrollSpeed);
     DrawGame();
 }
 
-function ScrollBackground() {
+function ScrollBackground(scrollSpeed) {
+    // Back plane
     for (var i = 0; i < backgroundScroll.length; i++) {
-        if (backgroundScroll[i].x < (skylineImg.width * screenScale * -1)) {
+        backgroundScroll[i].x -= (scrollSpeed * 0.3);
+        if (backgroundScroll[i].x <= (backgroundImg.width * screenScale * -1) - (500 * screenScale)) {
             backgroundScroll.splice(0, 1);
-            backgroundScroll.push({
-                x: backgroundScroll[backgroundScroll.length - 1].x + skylineImg.width * screenScale,
-                y: 0
+            if (backgroundIndex > 5) {
+                backgroundScroll.push({
+                    x: backgroundScroll[backgroundScroll.length - 1].x + backgroundImg.width * screenScale,
+                    y: 0,
+                    image: backgroundImg2
+                });
+                backgroundIndex -= backgroundIndex;
+            }
+            else {
+                backgroundScroll.push({
+                    x: backgroundScroll[backgroundScroll.length - 1].x + backgroundImg.width * screenScale,
+                    y: 0,
+                    image: backgroundImg
+                });
+            }
+            backgroundIndex++;
+        }
+    }
+    // Scroll middle plane
+    for (var i = 0; i < midgroundScroll.length; i++) {
+        midgroundScroll[i].x -= (scrollSpeed * 0.5);
+        if (midgroundScroll[i].x <= (midgroundImg.width * screenScale * -1) - (500 * screenScale)) {
+            midgroundScroll.splice(0, 1);
+            midgroundScroll.push({
+                x: midgroundScroll[midgroundScroll.length - 1].x + midgroundImg.width * screenScale,
+                y: 0,
+                image: midgroundImg
             });
-            objects.push(backgroundScroll[backgroundScroll.length - 1]);
+        }
+    }
+    // Scroll near plane
+    for (var i = 0; i < foregroundScroll.length; i++) {
+        foregroundScroll[i].x -= scrollSpeed * 0.75;
+        if (foregroundScroll[i].x <= (foregroundImg.width * screenScale * -1) - (1000 * screenScale)) {
+            foregroundScroll.splice(0, 1);
+            foregroundScroll.push({
+                x: foregroundScroll[foregroundScroll.length - 1].x + foregroundImg.width * screenScale,
+                y: 0,
+                image: foregroundImg
+            });
         }
     }
 }
@@ -761,8 +947,17 @@ function DrawPause(logoMult) {
 
 function DrawBackground() {
     backgroundCtx.clearRect(0, 0, width, height);
+    // Parallax: Back plane
     for (var i = 0; i < backgroundScroll.length; i++) {
-        backgroundCtx.drawImage(skylineImg, backgroundScroll[i].x, 0, skylineImg.width * screenScale, skylineImg.height * screenScale);
+        backgroundCtx.drawImage(backgroundScroll[i].image, backgroundScroll[i].x, 0, backgroundImg.width * screenScale, backgroundImg.height * screenScale);
+    }
+    // Parallax: Mid plane
+    for (var i = 0; i < midgroundScroll.length; i++) {
+        backgroundCtx.drawImage(midgroundScroll[i].image, midgroundScroll[i].x, 0, midgroundImg.width * screenScale, midgroundImg.height * screenScale);
+    }
+    // Parallax: Close plane
+    for (var i = 0; i < foregroundScroll.length; i++) {
+        backgroundCtx.drawImage(foregroundScroll[i].image, foregroundScroll[i].x, 0, foregroundImg.width * screenScale, foregroundImg.height * screenScale);
     }
 }
 
@@ -776,9 +971,14 @@ function DrawCanvas() {
     }
 
     // Draw player
-    if (isAnimating)
+    if (isAnimating) {
         AnimationFrame(player);
-    foregroundCtx.drawImage(playerImg, spriteWidth * player.frameX, spriteHeight * player.frameY, spriteWidth, spriteHeight, player.x, player.y, player.width * screenScale, player.height * screenScale);
+        for (var i = 0; i < playerBullets.length; i++) {
+            AnimationFrame(playerBullets[i]);
+            foregroundCtx.drawImage(bulletImg, playerBullets[i].spriteWidth * playerBullets[i].frameX, playerBullets[i].spriteHeight * playerBullets[i].frameY, playerBullets[i].spriteWidth, playerBullets[i].spriteHeight, playerBullets[i].x, playerBullets[i].y, playerBullets[i].width * screenScale, playerBullets[i].height * screenScale);
+        }
+    }
+    foregroundCtx.drawImage(playerImg, player.spriteWidth * player.frameX, player.spriteHeight * player.frameY, player.spriteWidth, player.spriteHeight, player.x, player.y, player.width * screenScale, player.height * screenScale);
 }
 
 function DrawUI() {
