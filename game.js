@@ -1212,15 +1212,15 @@ function DrawUI() {
     var text = "Score: " + score;
     DrawText(text, 30 * screenScale, [25 * screenScale, 25 * screenScale], "white", "black", 8, "left", "top");
     text = "Health: " + player.health;
-    DrawText(text, 30 * screenScale, [(width - 25) * screenScale, 25 * screenScale], "white", "black", 8, "right", "top");
+    DrawText(text, 30 * screenScale, [25 * screenScale, 65 * screenScale], "white", "black", 8, "left", "top");
     for (var i = 0; i < player.healthMax; i++) {
         if (player.health-1 < i) {
             UICtx.globalAlpha = 0.2;
-            UICtx.drawImage(heartImg, ((width - 50 - 25) - (i * 60)) * screenScale, 75 * screenScale, 50, 47);
+            UICtx.drawImage(heartImg, 25 * screenScale + (i * 60) * screenScale, 110 * screenScale, 50, 47);
         }
         else {
             UICtx.globalAlpha = 1;
-            UICtx.drawImage(heartImg, ((width - 50 - 25) - (i * 60)) * screenScale, 75 * screenScale, 50, 47);
+            UICtx.drawImage(heartImg, 25 * screenScale + (i * 60) * screenScale, 110 * screenScale, 50, 47);
         }
 
         UICtx.globalAlpha = 1;
