@@ -123,6 +123,7 @@ var bullet = {
 }
 var bulletImg = new Image();
 var enemies = [];
+var enemyImg = new Image();
 var playerBullets = [];
 var enemyBullets = [];
 let player = Object.assign({}, playerInit);
@@ -143,6 +144,9 @@ var spriteWidth = 199;
 var spriteHeight = 188;
 var playerImg = new Image();
 var speed = 4;
+
+var enemySpawnTimer = 0;
+var enemySpawnTimerMax = 30;
 
 var globalX = 0;                // Player global position
 
@@ -242,6 +246,8 @@ function Initialise() {
     foregroundImg.src = "foreground.png";
 
     bulletImg.src = "assets/player/bullet.png";
+
+    enemyImg.src = "assets/enemy/drone.png";
 
     imgCrate.src = "RTS_Crate_0.png";
     SetPlayerSprite("runRight");
@@ -558,6 +564,7 @@ function Generate(object) {
             player.shootTimer -= player.shootTimer;
             break;
         case "enemy":
+
             break;
         default:
             break;
@@ -759,6 +766,13 @@ function UpdateBullets() {
 function UpdateObjects() {
     ApplyGravity();
     UpdateBullets();
+    enemySpawnTimer++;
+    if (enemySpawnTimer > enemySpawnTimerMax) {
+        var rnd = Math.random() * 100;
+        if (rnd > 80) {
+            Generate("enemy");
+        }
+    }
 }
 
 function UpdateGame() {
