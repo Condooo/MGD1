@@ -1,6 +1,18 @@
 var debugActive = true;
 
+var fps = 60;
+var now;
+var then = Date.now();
+var interval = 1000 / fps;
+var delta;
+
 var titleImg = new Image();
+var charPort0 = new Image();
+var charPort1 = new Image();
+var charPort2 = new Image();
+var charPort0trans = new Image();
+var charPort1trans = new Image();
+var charPort2trans = new Image();
 var BGM = new Audio("assets/sfx/title.mp3");
 BGM.loop = true;
 BGM.autoplay = true;
@@ -12,7 +24,7 @@ var levelUpsfx = new Audio("assets/sfx/levelUp.mp3")
 var hitsfx = new Audio("assets/sfx/hit.mp3")
 
 
-var GAMESTATES = ["Splash", "Game", "Pause", "GameOver", "Hiscore", "Instructions"];    // Store the available gamestates
+var GAMESTATES = ["Splash", "Game", "Pause", "GameOver", "Hiscore", "Instructions", "CharSelect"];    // Store the available gamestates
 var currentGameState = GAMESTATES[0];                                   // Store and assign the currently selected gamestate
 var level = 1;
 var levelUpScore = 200;
@@ -44,10 +56,14 @@ var backgroundImg2 = new Image();
 var backgroundIndex = 0;
 var midgroundImg = new Image();
 var foregroundImg = new Image();
+var highwayImg = new Image();
+var treeImg = new Image();
 var scrollSpeed = 5;                                    // Screen scroll speed
 var backgroundScroll = [];                              // Parallax background planes
 var midgroundScroll = [];
 var foregroundScroll = [];
+var treesScroll = [];
+var highwayScroll = [];
 
 // Splash screen values
 var splashPos = [width / 2, height / 2];                // Set position for splash screen menu text
@@ -57,7 +73,7 @@ var pulseExtent = 20;                                   // Set extent text pulse
 var increase = Math.PI * pulseSpeed / 100;              // Rate counter increases at
 var menuOptions = [];                                   // Array to store the current number of menu options
 var selected = 0;                                       // Iterator to indicate current selected menu option
-var numOptions = [3, 0, 4, 2, 1, 1];                       // Specify number of menu options available for each game state
+var numOptions = [3, 0, 4, 2, 1, 1, 3];                       // Specify number of menu options available for each game state
 
 
 
@@ -111,6 +127,7 @@ var sprite = {
 
 // PLAYER DATA
 var playerInit = {
+    characterIndex: 0,
     x: width / 4,                   // Player position: X
     y: height - 282 * screenScale,                  //                : Y
     width: 200,                     // Player dimensions: width
@@ -232,57 +249,175 @@ function DetectMobile() {
 
 // Compares keyboard states and returns true only once on key down
 function KeyDown(keycode) {
-    if (keys[keycode] && keys[keycode] != previousKeys[keycode])
+    if (keys[keycode] && keys[keycode] != previousKeys[keycode]) {
+        previousKeys[keycode] = true;
         return true;
+    }
     else
         return false;
 }
 // Compares keyboard states and returns true only once on key up
 function KeyUp(keycode) {
-    if (!keys[keycode] && keys[keycode] != previousKeys[keycode])
+    if (!keys[keycode] && keys[keycode] != previousKeys[keycode]) {
+        previousKeys[keycode] = false;
         return true;
+    }
     else
         return false;
 }
 
-function SetPlayerSprite(sprite) {
-    playerImg.src = "assets/player/" + sprite + ".png";
+function SetPlayerCharacter(characterIndex) {
+    player.characterIndex = characterIndex;
+    SetPlayerSprite(characterIndex, "idleRight");
+    switch (characterIndex) {
+        case 0:
+            player.spriteWidth = 199;
+            player.spriteHeight = 188;
+            break;
+        case 1:
+            player.spriteWidth = 199;
+            player.spriteHeight = 199;
+            break;
+        case 2:
+            player.spriteWidth = 199;
+            player.spriteHeight = 178;
+            break;
+        case 3:
+            player.spriteWidth = 199;
+            player.spriteHeight = 199;
+            break;
+        default:
+            player.spriteWidth = 199;
+            player.spriteHeight = 188;
+            break;
+    }
+}
+
+function SetPlayerSprite(characterIndex, sprite) {
     player.sprite = sprite;
+    var tempSprite = sprite;
+
+    // Return to start of spritesheet
     player.frameX = 0;
     player.frameY = 0;
     player.frame = 0;
-    player.tag = "player";
 
-    if (sprite == "runRight" || sprite == "runLeft") {
-        player.frameMax = 7;
-        player.frameXMax = 2;
-        player.frameYMax = 2;
+    switch (characterIndex) {
+        case 0:
+            if (sprite == "runRight" || sprite == "runLeft") {
+                player.frameMax = 7;
+                player.frameXMax = 2;
+                player.frameYMax = 2;
+            }
+            else if (sprite == "idleLeft" || sprite == "idleRight") {
+                player.frameMax = 3;
+                player.frameXMax = 1;
+                player.frameYMax = 1;
+            }
+            else if (sprite == "runShootRight" || sprite == "runShootLeft") {
+                player.frameMax = 7;
+                player.frameXMax = 2;
+                player.frameYMax = 2;
+            }
+            else if (sprite == "shootRight" || sprite == "shootLeft") {
+                player.frameMax = 0;
+                player.frameXMax = 0;
+                player.frameYMax = 0;
+            }
+            else if (sprite == "jumpLeft" || sprite == "jumpRight") {
+                player.frameMax = 2;
+                player.frameXMax = 1;
+                player.frameYMax = 1;
+            }
+            else if (sprite == "jumpShootLeft" || sprite == "jumpShootRight") {
+                player.frameMax = 0;
+                player.frameXMax = 0;
+                player.frameYMax = 0;
+            }
+            break;
+        case 1:
+            if (sprite == "runRight" || sprite == "runLeft") {
+                player.frameMax = 7;
+                player.frameXMax = 7;
+                player.frameYMax = 0;
+            }
+            else if (sprite == "idleLeft" || sprite == "idleRight") {
+                player.frameMax = 3;
+                player.frameXMax = 3;
+                player.frameYMax = 0;
+            }
+            else if (sprite == "runShootRight" || sprite == "runShootLeft") {
+                player.frameMax = 7;
+                player.frameXMax = 7;
+                player.frameYMax = 0;
+            }
+            else if (sprite == "shootRight" || sprite == "shootLeft") {
+                player.frameMax = 0;
+                player.frameXMax = 0;
+                player.frameYMax = 0;
+            }
+            else if (sprite == "jumpLeft" || sprite == "jumpRight") {
+                tempSprite = sprite;
+                if (sprite == "jumpLeft") {
+                    if (player.velY < 0)
+                        sprite = "jumpLeftUp";
+                    else
+                        sprite = "jumpLeftDown";
+                }
+                else {
+                    if (player.velY < 0)
+                        sprite = "jumpRightUp";
+                    else
+                        sprite = "jumpRightDown";
+                }
+                player.frameMax = 0;
+                player.frameXMax = 0;
+                player.frameYMax = 0;
+            }
+            else if (sprite == "jumpShootLeft" || sprite == "jumpShootRight") {
+                player.frameMax = 0;
+                player.frameXMax = 0;
+                player.frameYMax = 0;
+            }
+            break;
+        case 2:
+            if (sprite == "runRight" || sprite == "runLeft") {
+                player.frameMax = 11;
+                player.frameXMax = 11;
+                player.frameYMax = 0;
+            }
+            else if (sprite == "idleLeft" || sprite == "idleRight") {
+                player.frameMax = 3;
+                player.frameXMax = 1;
+                player.frameYMax = 1;
+            }
+            else if (sprite == "runShootRight" || sprite == "runShootLeft") {
+                player.frameMax = 11;
+                player.frameXMax = 3;
+                player.frameYMax = 2;
+            }
+            else if (sprite == "shootRight" || sprite == "shootLeft") {
+                player.frameMax = 0;
+                player.frameXMax = 0;
+                player.frameYMax = 0;
+            }
+            else if (sprite == "jumpLeft" || sprite == "jumpRight") {
+                player.frameMax = 7;
+                player.frameXMax = 2;
+                player.frameYMax = 2;
+            }
+            else if (sprite == "jumpShootLeft" || sprite == "jumpShootRight") {
+                player.frameMax = 0;
+                player.frameXMax = 0;
+                player.frameYMax = 0;
+            }
+            break;
+        default:
+            break;
     }
-    else if (sprite == "idleLeft" || sprite == "idleRight") {
-        player.frameMax = 3;
-        player.frameXMax = 1;
-        player.frameYMax = 1;
-    }
-    else if (sprite == "runShootRight" || sprite == "runShootLeft") {
-        player.frameMax = 7;
-        player.frameXMax = 2;
-        player.frameYMax = 2;
-    }
-    else if (sprite == "shootRight" || sprite == "shootLeft") {
-        player.frameMax = 0;
-        player.frameXMax = 0;
-        player.frameYMax = 0;
-    }
-    else if (sprite == "jumpLeft" || sprite == "jumpRight") {
-        player.frameMax = 2;
-        player.frameXMax = 1;
-        player.frameYMax = 1;
-    }
-    else if (sprite == "jumpShootLeft" || sprite == "jumpShootRight") {
-        player.frameMax = 0;
-        player.frameXMax = 0;
-        player.frameYMax = 0;
-    }
+
+    playerImg.src = "assets/player/character" + player.characterIndex + "/" + sprite + ".png";
+    player.sprite = tempSprite;
 }
 
 function SetEnemySprite(i) {
@@ -308,12 +443,21 @@ function Initialise() {
     backgroundImg2.src = "skyline-b.png";
     midgroundImg.src = "midground.png";
     foregroundImg.src = "foreground.png";
+    highwayImg.src = "assets/environment/highway.png";
+    treeImg.src = "assets/environment/tree.png";
     bulletImg.src = "assets/player/bullet.png";
     enemyImg.src = "assets/enemy/drone.png";
     explosionImg.src = "assets/enemy/explosion.png";
     imgCrate.src = "RTS_Crate_0.png";
     heartImg.src = "assets/UI/heart.png";
-    SetPlayerSprite("runRight");
+
+    SetPlayerCharacter(2, "idleRight");
+    charPort0.src = "assets/player/character0/portrait.png";
+    charPort1.src = "assets/player/character1/portrait.png";
+    charPort2.src = "assets/player/character2/portrait.png";
+    charPort0trans.src = "assets/player/character0/portraitTrans.png";
+    charPort1trans.src = "assets/player/character1/portraitTrans.png";
+    charPort2trans.src = "assets/player/character2/portraitTrans.png";
 
     // Parallax: Background
     for (var i = 0; i < 7; i++) {
@@ -337,6 +481,28 @@ function Initialise() {
             x: i * (986 * screenScale),
             y: 0,
             image: foregroundImg
+        });
+    }
+
+    // Parallax: Trees
+    for (var i = 0; i < 7; i++) {
+        treesScroll.push({
+            x: i * (288 * screenScale),
+            y: height - 480 * screenScale,
+            height: 480,
+            width: 288,
+            image: treeImg
+        });
+    }
+
+    // Parallax: Highway
+    for (var i = 0; i < 7; i++) {
+        highwayScroll.push({
+            x: i * (384 * screenScale),
+            y: height - 303 * screenScale,
+            height: 303,
+            width: 384,
+            image: highwayImg
         });
     }
 
@@ -546,7 +712,7 @@ function PlayerControl() {
     }
     else {                                                      // PC Input Handler
         if (keys[13]) {
-            player.isShooting = true;
+
         }
         else
             player.isShooting = false;
@@ -554,18 +720,19 @@ function PlayerControl() {
             //if (player.y < (canvas.height - player.height))
 
         }
-        if (keys[87]) {                                         // W: Up
-
+        if (keys[32]) {                                         // SPACE: Shoot
+            player.isShooting = true;
         }
         if (keys[68]) {                                         // D: Right
-            if (player.isGrounded) {
+            if (!player.isShooting)
                 player.facing = "right";
+            if (player.isGrounded) {
                 if (player.isShooting) {
                     if (player.sprite != "runShootRight")
-                        SetPlayerSprite("runShootRight");
+                        SetPlayerSprite(player.characterIndex,"runShootRight");
                 }
                 else if (player.sprite != "runRight")
-                    SetPlayerSprite("runRight");
+                    SetPlayerSprite(player.characterIndex, "runRight");
             }
             if (player.x < (width) - player.width)
                 player.velX += player.moveSpeed;
@@ -573,15 +740,16 @@ function PlayerControl() {
                 player.velX = 0;
         }
         if (keys[65]) {                                         // A: Left
-            if (player.isGrounded) {
+            if (!player.isShooting)
                 player.facing = "left";
+            if (player.isGrounded) {
                 //if (player.isShooting) {
                 //    if (player.sprite != "runShootLeft")
                 //        SetPlayerSprite("runShootLeft");
                 //}
                 //else
                     if (player.sprite != "runLeft")
-                    SetPlayerSprite("runLeft");
+                        SetPlayerSprite(player.characterIndex,"runLeft");
             }
             if (player.x > 0)
                 player.velX -= player.moveSpeed;
@@ -596,24 +764,24 @@ function PlayerControl() {
                         if (player.facing == "right") {
                             var sprite = "shootRight";
                             if (player.sprite != sprite) {
-                                SetPlayerSprite(sprite);
+                                SetPlayerSprite(player.characterIndex,sprite);
                             }
                         }
                     }
                     else if (player.sprite != "runShootRight")
-                        SetPlayerSprite("runShootRight");
+                        SetPlayerSprite(player.characterIndex,"runShootRight");
                 }
             }
             else {
                 if (player.isGrounded)
                     if (player.x > 0) {
                         if (player.sprite != "idleRight") {
-                            SetPlayerSprite("idleRight");
+                            SetPlayerSprite(player.characterIndex,"idleRight");
                             player.facing = "right";
                         }
                     }
                     else if (player.sprite != "runRight") {
-                        SetPlayerSprite("runRight");
+                        SetPlayerSprite(player.characterIndex,"runRight");
                         player.facing = "right";
                     }
             }
@@ -623,27 +791,27 @@ function PlayerControl() {
             if (player.facing == "right") {
                 if (!player.isShooting) {
                     if (player.sprite != "jumpRight")
-                        SetPlayerSprite("jumpRight");
+                        SetPlayerSprite(player.characterIndex,"jumpRight");
                 }
                 else {
                     if (player.sprite != "jumpShootRight")
-                        SetPlayerSprite("jumpShootRight");
+                        SetPlayerSprite(player.characterIndex,"jumpShootRight");
                 }
             }
             else {
                 if (!player.isShooting) {
                     if (player.sprite != "jumpLeft")
-                        SetPlayerSprite("jumpLeft");
+                        SetPlayerSprite(player.characterIndex,"jumpLeft");
                 }
                 else {
                     if (player.sprite != "jumpShootLeft")
-                        SetPlayerSprite("jumpShootLeft");
+                        SetPlayerSprite(player.characterIndex,"jumpShootLeft");
                 }
             }
 
         }        
 
-        if (keys[32] && !previousKeys[32] && player.isGrounded) { // Space: Jump
+        if (keys[87] && !previousKeys[87] && player.isGrounded) { // Space: Jump
             if (player.y > 0) {
                 player.velY -= player.jumpForce;
                 player.isGrounded = false;
@@ -655,7 +823,7 @@ function PlayerControl() {
             player.velY = 0;
             player.facing = "right";
             if (player.sprite != "hurt")
-                SetPlayerSprite("hurt");
+                SetPlayerSprite(player.characterIndex,"hurt");
         }
     }
 
@@ -665,7 +833,7 @@ function PlayerControl() {
     else
         player.velX *= airFriction;
 
-    player.x += player.velX;
+    //player.x += player.velX;
 }
 
 function Generate(object) {
@@ -702,14 +870,15 @@ function GameInput() {
         menuMove.play();
         ChangeState(2);
     }
-    if (KeyDown(13)) {
+    if (KeyDown(32)) {
         if (!player.isHurt) {
             lasersfx.currentTime = 0;
             lasersfx.play();
             Generate("bullet");
+            player.facing = "right";
         }
     }
-    if (keys[13] && player.facing != "left") {
+    if (keys[32] && player.facing != "left") {
         if (player.shootTimer > player.shootTimerMax) {
             if (!player.isHurt) {
                 lasersfx.currentTime = 0;
@@ -789,6 +958,10 @@ function ProcessInput() {
         case GAMESTATES[5]:
             InstructionInput();
             MenuNavigation();
+            break;
+        case GAMESTATES[6]:
+            CharSelectInput();
+            MenuNavigation();
         default:
             break;
     }
@@ -823,30 +996,59 @@ function GameOverInput() {
 }
 
 function MenuNavigation() {
-    if (KeyDown(40)) {  // Down arrow
-        menuMove.currentTime = 0;
-        menuMove.play();
+    if (currentGameState == GAMESTATES[6]) {
+        if (KeyDown(39)) {  // Right arrow
+            menuMove.currentTime = 0;
+            menuMove.play();
 
-        if (selected + 1 >= menuOptions.length) {
-            selected = 0;
-            counter = 0;
+            if (selected + 1 >= menuOptions.length) {
+                selected = 0;
+                counter = 0;
+            }
+            else {
+                selected++;
+                counter = 0;
+            }
         }
-        else {
-            selected++;
-            counter = 0;
+        if (KeyDown(37)) {  // Left arrow
+            menuMove.currentTime = 0;
+            menuMove.play();
+            if (selected - 1 < 0) {
+                selected = menuOptions.length - 1;
+                counter = 0;
+            }
+            else {
+                selected--;
+                counter = 0;
+            }
         }
     }
+    else {
+        if (KeyDown(40)) {  // Down arrow
+            menuMove.currentTime = 0;
+            menuMove.play();
 
-    if (KeyDown(38)) {  // Up arrow
-        menuMove.currentTime = 0;
-        menuMove.play();
-        if (selected - 1 < 0) {
-            selected = menuOptions.length - 1;
-            counter = 0;
+            if (selected + 1 >= menuOptions.length) {
+                selected = 0;
+                counter = 0;
+            }
+            else {
+                selected++;
+                counter = 0;
+            }
         }
-        else {
-            selected--;
-            counter = 0;
+
+        if (KeyDown(38)) {  // Up arrow
+            menuMove.currentTime = 0;
+            menuMove.play();
+            if (selected - 1 < 0) {
+                selected = menuOptions.length - 1;
+                counter = 0;
+            }
+            else {
+                selected--;
+                counter = 0;
+            }
         }
     }
 }
@@ -872,7 +1074,35 @@ function StateControl() {
 }
 
 function InstructionInput() {
+    if (KeyDown(13) || KeyDown(27)) {
+        menuSelect.currentTime = 0;
+        menuSelect.play();
+        ChangeState(0);
+    }
+}
+
+function CharSelectInput() {
     if (KeyDown(13)) {
+        menuSelect.currentTime = 0;
+        menuSelect.play();
+        switch (selected) {
+            case 0:             // Character Select
+                SetPlayerCharacter(0);
+                ChangeState(1);
+                break;
+            case 1:             // Instructions
+                SetPlayerCharacter(1);
+                ChangeState(1);
+                break;
+            case 2:             // Hiscores
+                SetPlayerCharacter(2);
+                ChangeState(1);
+                break;
+            default:
+                break;
+        }
+    }
+    if (KeyDown(27)) {
         menuSelect.currentTime = 0;
         menuSelect.play();
         ChangeState(0);
@@ -885,14 +1115,14 @@ function SplashInput() {
         menuSelect.currentTime = 0;
         menuSelect.play();
         switch (selected) {
-            case 0: // Play
+            case 0:             // Character Select
                 BGM.play();
-                ChangeState(1);
+                ChangeState(6);
                 break;
-            case 1: // Instructions
+            case 1:             // Instructions
                 ChangeState(5);
                 break;
-            case 2: // Hiscores
+            case 2:             // Hiscores
                 //ChangeState(4);
                 break;
             default:
@@ -973,6 +1203,8 @@ function UpdateObjects() {
             player.hurtTimer = 0;
         }
     }
+
+    player.x += player.velX;
 }
 
 function UpdateGame() {
@@ -1030,41 +1262,144 @@ function ScrollBackground(scrollSpeed) {
             });
         }
     }
+
+    // Scroll near plane
+    for (var i = 0; i < treesScroll.length; i++) {
+        treesScroll[i].x -= scrollSpeed * 0.85;
+        if (treesScroll[i].x <= (foregroundImg.width * screenScale * -1) - (1000 * screenScale)) {
+            treesScroll.splice(0, 1);
+            treesScroll.push({
+                x: treesScroll[treesScroll.length - 1].x + foregroundImg.width * screenScale,
+                y: height - 480 * screenScale,
+                height: 480,
+                image: foregroundImg
+            });
+        }
+    }
 }
 
 function Update() {
+    requestAnimationFrame(Update);  // Request animation frame update
+
+    now = Date.now();
+    delta = now - then;
     ProcessInput();
-    var logoMult = Math.sin(counter) / pulseExtent + 0.5;
-    counter += increase;
-    // Determine state to update
-    switch (currentGameState) {
-        case GAMESTATES[0]:                 // Splash
-            ScrollBackground(scrollSpeed);
-            DrawSplash(logoMult);
+
+    if (delta > interval) {
+        then = now - (delta % interval);
+
+        var logoMult = Math.sin(counter) / pulseExtent + 0.5;
+        counter += increase;
+        // Determine state to update
+        switch (currentGameState) {
+            case GAMESTATES[0]:                 // Splash
+                ScrollBackground(scrollSpeed);
+                DrawSplash(logoMult);
+                break;
+            case GAMESTATES[1]:                 // Game
+                UpdateGame();
+                break;
+            case GAMESTATES[2]:                 // Pause
+                DrawPause(logoMult);
+                break;
+            case GAMESTATES[3]:                 // Game over
+                DrawGameOver(logoMult);
+                break;
+            case GAMESTATES[4]:                 // Hiscores
+                ScrollBackground(scrollSpeed);
+                DrawHiscores(logoMult);
+                break;
+            case GAMESTATES[5]:                 // Instructions
+                ScrollBackground(scrollSpeed);
+                DrawInstructions(logoMult);
+                break;
+            case GAMESTATES[6]:                 // Character select
+                ScrollBackground(scrollSpeed);
+                DrawCharSelect(logoMult);
+            default:
+                break;
+        }
+    }
+    previousKeys = keys.slice(0);   // Store current keystate to compare next frame
+}
+
+function DrawCharSelect(logoMult) {
+    UICtx.clearRect(0, 0, width, height);
+    UICtx.clearRect(0, 0, width, height);
+    DrawBackground();
+    foregroundCtx.clearRect(0, 0, width, height);
+    DrawText("SELECT A CHARACTER", 75, [width / 2, 100], "white", "black", 35, "center", "top");
+
+    var portSize = 200 * screenScale;
+    var deselectSize = 225 * screenScale;
+    var selectSize = 325 * screenScale;
+
+    switch (selected) {
+        case 0:
+            UICtx.strokeStyle = 'rgba(255,255,255,1.0)';
+            UICtx.lineWidth = 10 * screenScale;
+            UICtx.strokeRect((width / 3) - selectSize / 2, height / 2 - selectSize / 2, selectSize, selectSize);
+            UICtx.globalAlpha = 1.0;
+            UICtx.drawImage(charPort0, (width / 3) - ((portSize * 1.5) / 2), height / 2 - ((portSize * 1.5) / 2), (portSize * 1.5), (portSize * 1.5));
+            DrawText("VELA", 50, [width / 3, height / 2 + selectSize / 2 + 25 * screenScale], "white", "black", 10, "center", "top");
+            UICtx.globalAlpha = 1.0;
+
+            UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
+            UICtx.strokeRect((width / 2) - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
+            UICtx.globalAlpha = 0.5;
+            UICtx.drawImage(charPort1trans, (width / 2) - (portSize / 2), height / 2 - (portSize / 2), portSize, portSize);
+            UICtx.globalAlpha = 1.0;
+
+            UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
+            UICtx.strokeRect((width / 3) * 2 - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
+            UICtx.globalAlpha = 0.5;
+            UICtx.drawImage(charPort2trans, ((width / 3) * 2) - (portSize / 2), height / 2 - (portSize / 2), portSize, portSize);
+            UICtx.globalAlpha = 1.0;
             break;
-        case GAMESTATES[1]:                 // Game
-            UpdateGame();
+        case 1:
+            UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
+            UICtx.lineWidth = 10 * screenScale;
+            UICtx.strokeRect((width / 3) - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
+            UICtx.globalAlpha = 0.5;
+            UICtx.drawImage(charPort0trans, (width / 3) - (portSize / 2), height / 2 - ((portSize / 2)), portSize, portSize);
+            UICtx.globalAlpha = 1.0;
+
+            UICtx.strokeStyle = 'rgba(255,255,255,1.0)';
+            UICtx.strokeRect((width / 2) - selectSize / 2, height / 2 - selectSize / 2, selectSize, selectSize);
+            UICtx.globalAlpha = 1.0;
+            UICtx.drawImage(charPort1, (width / 2) - ((portSize * 1.5) / 2), height / 2 - (((portSize * 1.5) / 2)), (portSize * 1.5), (portSize * 1.5));
+            DrawText("QUINN", 50, [width / 2, height / 2 + selectSize / 2 + 25 * screenScale], "white", "black", 10, "center", "top");
+
+            UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
+            UICtx.strokeRect(((width / 3) * 2) - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
+            UICtx.globalAlpha = 0.5;
+            UICtx.drawImage(charPort2trans, ((width / 3) * 2) - (portSize / 2), height / 2 - (portSize / 2), portSize, portSize);
+            UICtx.globalAlpha = 1.0;
             break;
-        case GAMESTATES[2]:                 // Pause
-            DrawPause(logoMult);
-            break;
-        case GAMESTATES[3]:                 // Game over
-            DrawGameOver(logoMult);
-            break;
-        case GAMESTATES[4]:                 // Hiscores
-            ScrollBackground(scrollSpeed);
-            DrawHiscores(logoMult);
-            break;
-        case GAMESTATES[5]:                 // Instructions
-            ScrollBackground(scrollSpeed);
-            DrawInstructions(logoMult);
+        case 2:
+            UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
+            UICtx.lineWidth = 10 * screenScale;
+            UICtx.strokeRect((width / 3) - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
+            UICtx.globalAlpha = 0.5;
+            UICtx.drawImage(charPort0trans, (width / 3) - (portSize / 2), height / 2 - ((portSize / 2)), portSize, portSize);
+            UICtx.globalAlpha = 1.0;
+
+            UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
+            UICtx.strokeRect((width / 2) - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
+            UICtx.globalAlpha = 0.5;
+            UICtx.drawImage(charPort1, (width / 2) - ((portSize) / 2), height / 2 - (((portSize) / 2)), (portSize), (portSize));
+            UICtx.globalAlpha = 1.0;
+
+            UICtx.strokeStyle = 'rgba(255,255,255,1.0)';
+            UICtx.strokeRect(((width / 3) * 2) - selectSize / 2, height / 2 - selectSize / 2, selectSize, selectSize);
+            UICtx.globalAlpha = 1.0;
+            UICtx.drawImage(charPort2trans, ((width / 3) * 2) - (portSize * 1.5 / 2), height / 2 - (portSize * 1.5 / 2), portSize * 1.5, portSize * 1.5);
+            DrawText("PIXEL", 50, [(width / 3) * 2, height / 2 + selectSize / 2 + 25 * screenScale], "white", "black", 10, "center", "top");
             break;
         default:
             break;
     }
-
-    previousKeys = keys.slice(0);   // Store current keystate to compare next frame
-    requestAnimationFrame(Update);  // Request animation frame update
+    //UICtx.drawImage(titleImg, width / 2 - (titleImg.width * screenScale) / 2, 100, titleImg.width * screenScale, titleImg.height * screenScale);
 }
 
 function DrawGame() {
@@ -1091,25 +1426,33 @@ function DrawMenuText(text, sizeSelected, sizeUnselected, pos, spacing, fillCol,
 }
 
 function ChangeState(state) {
-    switch (state) {
-        case 0:
-            isAnimating = false;
-            break;
-        case 1:
-            isAnimating = true;
-            break;
-        case 2:
-            isAnimating = false;
-            break;
-        case 3:
-            isAnimating = false;
-            break;
-        case 4:
-            isAnimating = false;
-            break;
-        default:
-            break;
-    }
+    if (state == 1)
+        isAnimating = true;
+    else
+        isAnimating = false;
+
+    //switch (state) {
+    //    case 0:
+    //        isAnimating = false;
+    //        break;
+    //    case 1:
+    //        isAnimating = true;
+    //        break;
+    //    case 2:
+    //        isAnimating = false;
+    //        break;
+    //    case 3:
+    //        isAnimating = false;
+    //        break;
+    //    case 4:
+    //        isAnimating = false;
+    //        break;
+    //    case 5:
+    //        isAnimating = false;
+    //        break;
+    //    default:
+    //        break;
+    //}
     selected = 0;
     counter = 0;
     menuOptions.length = numOptions[state];
@@ -1174,6 +1517,16 @@ function DrawBackground() {
     for (var i = 0; i < foregroundScroll.length; i++) {
         backgroundCtx.drawImage(foregroundScroll[i].image, foregroundScroll[i].x, 0, foregroundImg.width * screenScale, foregroundImg.height * screenScale);
     }
+    // Parallax: Tree plane
+    for (var i = 0; i < treesScroll.length; i++) {
+        //console.log(treesScroll[i].);
+        backgroundCtx.drawImage(treesScroll[i].image, treesScroll[i].x, 0, treesScroll.width * screenScale, treesScroll.height * screenScale);
+    }
+    // Parallax: Highway plane
+    for (var i = 0; i < highwayScroll.length; i++) {
+        backgroundCtx.drawImage(highwayScroll[i].image, highwayScroll[i].x, height - highwayScroll[i].height, highwayScroll.width * screenScale, highwayScroll.height * screenScale);
+    }
+
 }
 
 function DrawCanvas() {
