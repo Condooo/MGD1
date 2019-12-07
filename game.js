@@ -17,11 +17,13 @@ var BGM = new Audio("assets/sfx/title.mp3");
 BGM.loop = true;
 BGM.autoplay = true;
 var menuMove = new Audio("assets/sfx/blip1.mp3");
-var menuSelect = new Audio("assets/sfx/blip2.mp3")
-var lasersfx = new Audio("assets/sfx/laser.ogg")
-var explosionsfx = new Audio("assets/sfx/explosion.mp3")
-var levelUpsfx = new Audio("assets/sfx/levelUp.mp3")
-var hitsfx = new Audio("assets/sfx/hit.mp3")
+var menuSelect = new Audio("assets/sfx/blip2.mp3");
+var lasersfx = new Audio("assets/sfx/laser.ogg");
+var explosionsfx = new Audio("assets/sfx/explosion.mp3");
+var levelUpsfx = new Audio("assets/sfx/levelUp.mp3");
+var hitsfx = new Audio("assets/sfx/hit.mp3");
+var powerup1sfx = new Audio("assets/sfx/p1.mp3");
+var powerup2sfx = new Audio("assets/sfx/p2.mp3");
 
 
 var GAMESTATES = ["Splash", "Game", "Pause", "GameOver", "Hiscore", "Instructions", "CharSelect"];    // Store the available gamestates
@@ -58,6 +60,8 @@ var midgroundImg = new Image();
 var foregroundImg = new Image();
 var highwayImg = new Image();
 var treeImg = new Image();
+var p1Img = new Image();
+var p2Img = new Image();
 var scrollSpeed = 5;                                    // Screen scroll speed
 var backgroundScroll = [];                              // Parallax background planes
 var midgroundScroll = [];
@@ -125,6 +129,21 @@ var sprite = {
     tag: ""
 };
 
+class Sprite {
+    constructor() {
+        this.x = 0;
+        this.y = 0;
+        this.velX = 0;
+        this.velY = 0;
+        this.img;
+        this.spriteWidth = 0;
+        this.spriteHeight = 0;
+        this.width = 0;
+        this.height = 0;
+        this.tag = "";
+    }
+}
+
 // PLAYER DATA
 var playerInit = {
     characterIndex: 0,
@@ -153,7 +172,12 @@ var playerInit = {
     tag: "player",
     spriteWidth: 199,
     spriteHeight: 188,
-
+    powerup1Active: false,
+    powerup2Active: false,
+    powerup1Timer: 0,
+    powerup1TimerMax: 150,
+    powerup2Timer: 0,
+    powerup2TimerMax: 150
 };
 var player = Object.assign({}, sprite, playerInit);
 
@@ -198,6 +222,7 @@ var airFriction = 0.85;
 
 var score = 0;
 var scoreIncrement = 100;
+var powerupBonus = 50;
 
 // -Sprite
 var playerImg = new Image();
@@ -209,7 +234,56 @@ var explosionImg = new Image();
 var groundHeight = height - (282 * screenScale);
 var imgCrate = new Image();
 var boxes = [];
+var powerups = [];
 
+
+class Particle {
+    constructor() {
+        this.x = 0;
+        this.y = 0;
+        this.velX = Math.floor(Math.random() * 50) - 25;
+        this.velY = Math.floor(Math.random() * 50) - 25;
+        this.r = 255;
+        this.g = Math.floor(Math.random() * 50) + 100;
+        this.b = Math.floor(Math.random() * 50) + 100;
+        this.alpha = 1.0;
+        this.fillStyle = "rbga(" + this.r + "," + this.g + ",0,1.0)";
+    }
+
+    generate(x, y, numParticles) {
+        for (var i = 0; i < numParticles; i++) {
+            var p = new Particle();
+            p.x = x;
+            p.y = y;
+            p.velX *= 0.2;
+            p.velY *= 0.2;
+            particles.push(p);
+        }
+    }
+
+    update() {
+        this.x += this.velX;
+        this.y += this.velY;
+        this.velX *= 0.995;
+        this.velY *= 0.995;
+        this.alpha -= 0.015;
+        this.x -= scrollSpeed;
+        //console.log(this.alpha);
+    }
+
+    fillStyle() {
+        return this.fillStyle;
+    }
+
+    Draw(ctx) {
+        ctx.beginPath();
+        //ctx.arc(this.x, this.y, 5 * screenScale, 0, 2 * Math.PI);
+        ctx.fillRect(this.x, this.y, 5 * screenScale, 5 * screenScale);
+        ctx.fill();
+    }
+}
+var p = new Particle();
+let particles = [];
 
 // Run setup when loaded
 window.addEventListener("load", function () {
@@ -230,6 +304,7 @@ document.body.addEventListener("keydown", function (e) {
 document.body.addEventListener("keyup", function (e) {
     keys[e.keyCode] = false;
 });
+
 
 function DetectMobile() {
     if (navigator.userAgent.match(/Android/i)
@@ -296,6 +371,7 @@ function SetPlayerCharacter(characterIndex) {
 function SetPlayerSprite(characterIndex, sprite) {
     player.sprite = sprite;
     var tempSprite = sprite;
+
 
     // Return to start of spritesheet
     player.frameX = 0;
@@ -458,6 +534,9 @@ function Initialise() {
     charPort0trans.src = "assets/player/character0/portraitTrans.png";
     charPort1trans.src = "assets/player/character1/portraitTrans.png";
     charPort2trans.src = "assets/player/character2/portraitTrans.png";
+
+    p1Img.src = "assets/props/powerup1.png";
+    p2Img.src = "assets/props/powerup2.png";
 
     // Parallax: Background
     for (var i = 0; i < 7; i++) {
@@ -624,6 +703,43 @@ function CalculateCollisions() {
         player.velY = 0;
         player.isGrounded = true;
     }
+    for (var i = 0; i < powerups.length; i++) {
+        if (powerups[i].y > (height - powerups[i].height * screenScale - 65 * screenScale)) {
+            powerups[i].y = (height - powerups[i].height * screenScale - 65 * screenScale)
+            powerups[i].velY = 0;
+        }
+        if (powerups[i].x < 0 - powerups[i].width * screenScale)
+            powerups.splice(i, 1);
+
+        var dir = null;
+        dir = colCheck(player, powerups[i], true);
+                    
+        if (dir != null) {
+            switch (powerups[i].tag) {
+                case 0:
+                    powerup1sfx.currentTime = 0;
+                    powerup1sfx.play();
+                    player.powerup1Active = true;
+                    player.powerup1Timer = 0;
+                    powerups.splice(i, 1);
+                    //console.log("powerup 1 actice: " + powerup1Active);
+                    // TODO Powerup 1
+                    break;
+                case 1:
+                    powerup1sfx.currentTime = 0;
+                    powerup1sfx.play();
+                    player.shootTimerMax = 5;
+                    player.powerup2Active = true;
+                    player.powerup2Timer = 0;
+                    powerups.splice(i, 1);
+                    // TODO Powerup 2
+                    break;
+                default:
+                    break;
+            }
+        }
+
+    }
 
     // Box collision
     for (var i = 0; i < boxes.length; i++) {
@@ -651,6 +767,12 @@ function CalculateCollisions() {
                 SetEnemySprite(j);
                 playerBullets[i].active = false;
                 score += scoreIncrement;
+                var rng = Math.floor(Math.random() * 100);
+                if (rng < 5) {
+                    Generate("powerup", enemies[j]);
+                    score += powerupBonus;
+                }
+                p.generate(enemies[j].x + enemies[j].width / 2, enemies[i].y + enemies[i].height/2, 50);
                 if (score > levelUpScore) {
                     level++;
                     levelUpScore += (levelIncrement * level);
@@ -836,15 +958,35 @@ function PlayerControl() {
     //player.x += player.velX;
 }
 
-function Generate(object) {
+function Generate(object, origin) {
     switch (object) {
         case "bullet":
             playerBullets.push(bullet);
             var bulletData = {
                 x: player.x + player.width - (65 * screenScale),
                 y: player.y + (player.height / 3) * screenScale - (7 * screenScale),
+
             }
             playerBullets[playerBullets.length - 1] = Object.assign({}, bullet, bulletData);
+            if (player.powerup1Active) {
+                //TODO powerup code
+                playerBullets.push(bullet);
+                var bulletData = {
+                    x: player.x + player.width - (65 * screenScale),
+                    y: player.y + (player.height / 3) * screenScale - (7 * screenScale),
+                    velX: 5,
+                    velY: -5
+                }
+                playerBullets[playerBullets.length - 1] = Object.assign({}, bullet, bulletData);
+                playerBullets.push(bullet);
+                var bulletData = {
+                    x: player.x + player.width - (65 * screenScale),
+                    y: player.y + (player.height / 3) * screenScale - (7 * screenScale),
+                    velX: 5,
+                    velY: 5
+                }
+                playerBullets[playerBullets.length - 1] = Object.assign({}, bullet, bulletData);
+            }
             player.shootTimer = 0;
             break;
         case "enemy":
@@ -858,13 +1000,35 @@ function Generate(object) {
             tempEnemy = Object.assign({}, enemy, enemyData);
             enemies.push(tempEnemy);
             break;
+        case "powerup":
+            var pUp = new Sprite();
+            pUp.x = origin.x + origin.width / 2;
+            pUp.y = origin.y + origin.height / 2;
+            pUp.spriteWidth = 48;
+            pUp.spriteHeight = 60;
+            pUp.width = 48;
+            pUp.height = 60;
+
+
+            var rnd = Math.floor(Math.random() * 100);
+            if (rnd < 50) {
+                pUp.img = p1Img;
+            pUp.tag = 0;
+            }
+            else {
+                pUp.img = p2Img;
+                pUp.tag = 1;
+            }
+            powerups.push(pUp);
+            objects.push(pUp);
+            break;
         default:
             break;
     }
 }
 
 function GameInput() {
-    console.log(player.x + " " + player.isGrounded);
+    //console.log(player.x + " " + player.isGrounded);
     if (KeyDown(27)) {
         menuMove.currentTime = 0;
         menuMove.play();
@@ -1152,11 +1316,13 @@ function DrawInstructions(logoMult) {
 function UpdateBullets() {
     for (var i = 0; i < playerBullets.length; i++) {
         playerBullets[i].x += playerBullets[i].speed;
+        playerBullets[i].y += playerBullets[i].velY;
+        //console.log(playerBullets[i].velY)
         if (playerBullets[i].x > width)
             playerBullets.splice(i, 1);
 
     }
-    if (keys[13])
+    if (keys[32] && player.facing != "left")
         player.shootTimer++;
 }
 
@@ -1204,6 +1370,22 @@ function UpdateObjects() {
         }
     }
 
+    if (player.powerup1Active) {
+        player.powerup1Timer++;
+        if (player.powerup1Timer > player.powerup1TimerMax) {
+            player.powerup1Active = false;
+            player.powerup1Timer = 0;
+        }
+    }
+    if (player.powerup2Active) {
+        player.powerup2Timer++;
+        if (player.powerup2Timer > player.powerup2TimerMax) {
+            player.powerup2Active = false;
+            player.powerup2Timer = 0;
+            player.shootTimerMax = 20;
+        }
+    }
+
     player.x += player.velX;
 }
 
@@ -1212,6 +1394,7 @@ function UpdateGame() {
     CalculateCollisions();
     ScrollBackground(scrollSpeed);
     DrawGame();
+    console.log(player.powerup1Active);
 }
 
 function ScrollBackground(scrollSpeed) {
@@ -1394,7 +1577,7 @@ function DrawCharSelect(logoMult) {
             UICtx.strokeRect(((width / 3) * 2) - selectSize / 2, height / 2 - selectSize / 2, selectSize, selectSize);
             UICtx.globalAlpha = 1.0;
             UICtx.drawImage(charPort2trans, ((width / 3) * 2) - (portSize * 1.5 / 2), height / 2 - (portSize * 1.5 / 2), portSize * 1.5, portSize * 1.5);
-            DrawText("PIXEL", 50, [(width / 3) * 2, height / 2 + selectSize / 2 + 25 * screenScale], "white", "black", 10, "center", "top");
+            DrawText("PYXEL", 50, [(width / 3) * 2, height / 2 + selectSize / 2 + 25 * screenScale], "white", "black", 10, "center", "top");
             break;
         default:
             break;
@@ -1538,6 +1721,9 @@ function DrawCanvas() {
         backgroundCtx.drawImage(imgCrate, boxes[i].x, boxes[i].y, boxes[i].width, boxes[i].height);
     }
 
+
+    //console.log(powerups.length);
+
     // Animate sprites
     if (isAnimating) {
         AnimationFrame(player);
@@ -1557,6 +1743,13 @@ function DrawCanvas() {
             AnimationFrame(enemies[i]);
         foregroundCtx.drawImage(enemies[i].sprite, enemies[i].spriteWidth * enemies[i].frameX, enemies[i].spriteHeight * enemies[i].frameY, enemies[i].spriteWidth, enemies[i].spriteHeight, enemies[i].x, enemies[i].y, enemies[i].width * screenScale, enemies[i].height * screenScale);
     }
+
+    for (var i = 0; i < powerups.length; i++) {
+        foregroundCtx.drawImage(powerups[i].img, powerups[i].x, powerups[i].y, powerups[i].width, powerups[i].height);
+        //console.log(powerups[i].drawHeight);
+    }
+
+
 }
 
 
@@ -1597,6 +1790,19 @@ function DrawUI() {
         DrawMenuText("LEVEL " + level, 75, 75, [width / 2, 25 * screenScale], 0, textCol, "white", "black", "white", 10, 25, "center", "top", 0);
     else
         DrawMenuText("LEVEL MAX", 75, 75, [width / 2, 25 * screenScale], 0, textCol, "white", "black", "white", 10, 25, "center", "top", 0);
+
+    if (particles.length > 0) {
+        for (var i = particles.length-1; i >= 0; i--) {
+            particles[i].update();
+            if (particles[i].alpha < 0) {
+                particles.splice(i, 1);
+                //console.log("Deleted particle");
+            }
+
+            UICtx.fillStyle = "rgba(" + particles[i].r + "," + particles[i].g + "," + particles[i].b + "," + particles[i].alpha + ")";
+            particles[i].Draw(UICtx);
+        }
+    }
 }
 
 function DrawText(text, size, pos, fillCol, strokeCol, strokeWidth, align, baseline) {
