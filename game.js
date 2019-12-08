@@ -23,7 +23,7 @@ var explosionsfx = new Audio("assets/sfx/explosion.mp3");
 var levelUpsfx = new Audio("assets/sfx/levelUp.mp3");
 var hitsfx = new Audio("assets/sfx/hit.mp3");
 var powerup1sfx = new Audio("assets/sfx/p1.mp3");
-var powerup2sfx = new Audio("assets/sfx/p2.mp3");
+//var powerup2sfx = new Audio("assets/sfx/p2.mp3");
 
 
 var GAMESTATES = ["Splash", "Game", "Pause", "GameOver", "Hiscore", "Instructions", "CharSelect"];    // Store the available gamestates
@@ -538,6 +538,8 @@ function Initialise() {
     p1Img.src = "assets/props/powerup1.png";
     p2Img.src = "assets/props/powerup2.png";
 
+    ResetLevel();
+
     // Parallax: Background
     for (var i = 0; i < 7; i++) {
         backgroundScroll.push({
@@ -564,11 +566,11 @@ function Initialise() {
     }
 
     // Parallax: Trees
-    for (var i = 0; i < 7; i++) {
+    for (var i = 0; i < 15; i++) {
         treesScroll.push({
             x: i * (288 * screenScale),
-            y: height - 480 * screenScale,
-            height: 480,
+            y: 0,
+            height: 1080,
             width: 288,
             image: treeImg
         });
@@ -578,8 +580,8 @@ function Initialise() {
     for (var i = 0; i < 7; i++) {
         highwayScroll.push({
             x: i * (384 * screenScale),
-            y: height - 303 * screenScale,
-            height: 303,
+            y: 0,
+            height: 1080,
             width: 384,
             image: highwayImg
         });
@@ -712,30 +714,34 @@ function CalculateCollisions() {
             powerups.splice(i, 1);
 
         var dir = null;
-        dir = colCheck(player, powerups[i], true);
-                    
-        if (dir != null) {
-            switch (powerups[i].tag) {
-                case 0:
-                    powerup1sfx.currentTime = 0;
-                    powerup1sfx.play();
-                    player.powerup1Active = true;
-                    player.powerup1Timer = 0;
-                    powerups.splice(i, 1);
-                    //console.log("powerup 1 actice: " + powerup1Active);
-                    // TODO Powerup 1
-                    break;
-                case 1:
-                    powerup1sfx.currentTime = 0;
-                    powerup1sfx.play();
-                    player.shootTimerMax = 5;
-                    player.powerup2Active = true;
-                    player.powerup2Timer = 0;
-                    powerups.splice(i, 1);
-                    // TODO Powerup 2
-                    break;
-                default:
-                    break;
+        if (powerups.length > 0) {
+            dir = colCheck(player, powerups[i], true);
+            
+
+            if (dir != null) {
+                console.log("Collision detected");
+                switch (powerups[i].tag) {
+                    case 0:
+                        powerup1sfx.currentTime = 0;
+                        powerup1sfx.play();
+                        player.powerup1Active = true;
+                        player.powerup1Timer = 0;
+                        powerups.splice(i, 1);
+                        //console.log("powerup 1 actice: " + powerup1Active);
+                        // TODO Powerup 1
+                        break;
+                    case 1:
+                        powerup1sfx.currentTime = 0;
+                        powerup1sfx.play();
+                        player.shootTimerMax = 5;
+                        player.powerup2Active = true;
+                        player.powerup2Timer = 0;
+                        powerups.splice(i, 1);
+                        // TODO Powerup 2
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
@@ -772,7 +778,8 @@ function CalculateCollisions() {
                     Generate("powerup", enemies[j]);
                     score += powerupBonus;
                 }
-                p.generate(enemies[j].x + enemies[j].width / 2, enemies[i].y + enemies[i].height/2, 50);
+                if (enemies.length > 0)
+                    p.generate(enemies[j].x + enemies[j].width / 2, enemies[i].y + enemies[i].height/2, 50);
                 if (score > levelUpScore) {
                     level++;
                     levelUpScore += (levelIncrement * level);
@@ -810,6 +817,7 @@ function CalculateCollisions() {
     for (var i = 0; i < enemies.length; i++) {
         if (!enemies[i].active) {
             enemies.splice(i, 1);
+            i--;
         }
     }
 }
@@ -1006,8 +1014,8 @@ function Generate(object, origin) {
             pUp.y = origin.y + origin.height / 2;
             pUp.spriteWidth = 48;
             pUp.spriteHeight = 60;
-            pUp.width = 48;
-            pUp.height = 60;
+            pUp.width = 48 * screenScale;
+            pUp.height = 60 * screenScale;
 
 
             var rnd = Math.floor(Math.random() * 100);
@@ -1066,6 +1074,8 @@ function ResetLevel() {
     enemySpawnTimerMax = 50;
     player.isHurt = false;
     player.hurtTimer = 0;
+    powerups.length = 0;
+    particles.length = 0;
 }
 
 function PauseInput() {
@@ -1280,7 +1290,7 @@ function SplashInput() {
         menuSelect.play();
         switch (selected) {
             case 0:             // Character Select
-                BGM.play();
+                //BGM.play();
                 ChangeState(6);
                 break;
             case 1:             // Instructions
@@ -1394,7 +1404,7 @@ function UpdateGame() {
     CalculateCollisions();
     ScrollBackground(scrollSpeed);
     DrawGame();
-    console.log(player.powerup1Active);
+    //console.log(player.powerup1Active);
 }
 
 function ScrollBackground(scrollSpeed) {
@@ -1449,13 +1459,29 @@ function ScrollBackground(scrollSpeed) {
     // Scroll near plane
     for (var i = 0; i < treesScroll.length; i++) {
         treesScroll[i].x -= scrollSpeed * 0.85;
-        if (treesScroll[i].x <= (foregroundImg.width * screenScale * -1) - (1000 * screenScale)) {
-            treesScroll.splice(0, 1);
+        if (treesScroll[i].x <= 0 - (treesScroll[i].width * 2 * screenScale)) {
+            console.log("push");
             treesScroll.push({
-                x: treesScroll[treesScroll.length - 1].x + foregroundImg.width * screenScale,
-                y: height - 480 * screenScale,
-                height: 480,
-                image: foregroundImg
+                x: treesScroll[treesScroll.length - 1].x + treesScroll[i].width * screenScale,
+                y: 0,
+                height: 1080,
+                width: 288,
+                image: treeImg
+            });
+            treesScroll.splice(0, 1);
+        }
+    }
+
+    for (var i = 0; i < highwayScroll.length; i++) {
+        highwayScroll[i].x -= scrollSpeed;
+        if (highwayScroll[i].x <= 0 - (highwayScroll[i].width * 2 * screenScale)) {
+            highwayScroll.splice(0, 1);
+            highwayScroll.push({
+                x: highwayScroll[highwayScroll.length - 1].x + highwayScroll[i].width * screenScale,
+                y: 0,
+                height: 1080,
+                width: 384,
+                image: highwayImg
             });
         }
     }
@@ -1463,6 +1489,7 @@ function ScrollBackground(scrollSpeed) {
 
 function Update() {
     requestAnimationFrame(Update);  // Request animation frame update
+
 
     now = Date.now();
     delta = now - then;
@@ -1703,11 +1730,12 @@ function DrawBackground() {
     // Parallax: Tree plane
     for (var i = 0; i < treesScroll.length; i++) {
         //console.log(treesScroll[i].);
-        backgroundCtx.drawImage(treesScroll[i].image, treesScroll[i].x, 0, treesScroll.width * screenScale, treesScroll.height * screenScale);
+        backgroundCtx.drawImage(treesScroll[i].image, treesScroll[i].x, 0, treesScroll[i].width * screenScale, treesScroll[i].height * screenScale);
+        //console.log(treesScroll[i].y);
     }
     // Parallax: Highway plane
     for (var i = 0; i < highwayScroll.length; i++) {
-        backgroundCtx.drawImage(highwayScroll[i].image, highwayScroll[i].x, height - highwayScroll[i].height, highwayScroll.width * screenScale, highwayScroll.height * screenScale);
+        backgroundCtx.drawImage(highwayScroll[i].image, highwayScroll[i].x, 0, highwayScroll[i].width * screenScale, highwayScroll[i].height * screenScale);
     }
 
 }
@@ -1745,9 +1773,10 @@ function DrawCanvas() {
     }
 
     for (var i = 0; i < powerups.length; i++) {
-        foregroundCtx.drawImage(powerups[i].img, powerups[i].x, powerups[i].y, powerups[i].width, powerups[i].height);
+        foregroundCtx.drawImage(powerups[i].img, powerups[i].x, powerups[i].y, powerups[i].width * screenScale, powerups[i].height * screenScale);
         //console.log(powerups[i].drawHeight);
     }
+
 
 
 }
@@ -1792,15 +1821,17 @@ function DrawUI() {
         DrawMenuText("LEVEL MAX", 75, 75, [width / 2, 25 * screenScale], 0, textCol, "white", "black", "white", 10, 25, "center", "top", 0);
 
     if (particles.length > 0) {
-        for (var i = particles.length-1; i >= 0; i--) {
+        for (var i = particles.length - 1; i >= 0; i--) {
             particles[i].update();
             if (particles[i].alpha < 0) {
                 particles.splice(i, 1);
+                i--;
                 //console.log("Deleted particle");
             }
-
-            UICtx.fillStyle = "rgba(" + particles[i].r + "," + particles[i].g + "," + particles[i].b + "," + particles[i].alpha + ")";
-            particles[i].Draw(UICtx);
+            if (particles.length > 0) {
+                UICtx.fillStyle = "rgba(" + particles[i].r + "," + particles[i].g + "," + particles[i].b + "," + particles[i].alpha + ")";
+                particles[i].Draw(UICtx);
+            }
         }
     }
 }
