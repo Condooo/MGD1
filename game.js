@@ -1,75 +1,93 @@
-var debugActive = true;
+// Debug
+var debugActive = true;                 // Debug boolean
 
-var fps = 60;
-var now;
-var then = Date.now();
-var interval = 1000 / fps;
-var delta;
+// Framerate
+var fps = 60;                           // Target FPS
+var now;                                // Current time
+var then = Date.now();                  // Previous time
+var interval = 1000 / fps;              // Ms interval per fps
+var delta;                              // Time delta
 
-var titleImg = new Image();
-var charPort0 = new Image();
-var charPort1 = new Image();
-var charPort2 = new Image();
-var charPort0trans = new Image();
-var charPort1trans = new Image();
-var charPort2trans = new Image();
-var BGM = new Audio("assets/sfx/title.mp3");
-BGM.loop = true;
-BGM.autoplay = true;
-var menuMove = new Audio("assets/sfx/blip1.mp3");
-var menuSelect = new Audio("assets/sfx/blip2.mp3");
-var lasersfx = new Audio("assets/sfx/laser.ogg");
-var explosionsfx = new Audio("assets/sfx/explosion.mp3");
-var levelUpsfx = new Audio("assets/sfx/levelUp.mp3");
-var hitsfx = new Audio("assets/sfx/hit.mp3");
-var powerup1sfx = new Audio("assets/sfx/p1.mp3");
-//var powerup2sfx = new Audio("assets/sfx/p2.mp3");
+// Images
+var titleImg = new Image();             // Splash title image
+var charPort0 = new Image();            // Character select portraits:
+var charPort1 = new Image();            //
+var charPort2 = new Image();            //
+var charPort0trans = new Image();       // Character select portraits: transparent:
+var charPort1trans = new Image();       //
+var charPort2trans = new Image();       //
+// Images: Parallax background
+var backgroundIndex = 0;                // Iterator for background scroll
+var backgroundImg = new Image();        // Parallax background images:
+var backgroundImg2 = new Image();       //
+var midgroundImg = new Image();         //
+var foregroundImg = new Image();        //
+var highwayImg = new Image();           //
+var treeImg = new Image();              //
+var p1Img = new Image();                // Powerup 1 image
+var p2Img = new Image();                // Powerup 2 image
+var backgroundScroll = [];              // Background image scrolls:
+var midgroundScroll = [];               //
+var foregroundScroll = [];              //
+var treesScroll = [];                   //
+var highwayScroll = [];                 //
+var scrollSpeed = 5;                    // Base screen scroll speed
+var isAnimating = false;                // Define whether sprite animation is active
 
+// Audio: music
+var BGM = new Audio("assets/sfx/title.mp3");                    // Background music
+BGM.loop = true;                                                // Set music to loop
+BGM.autoplay = true;                                            // Autoplay on load
+// Audio: SFX
+var menuMove = new Audio("assets/sfx/blip1.mp3");               // Menu navigation
+var menuSelect = new Audio("assets/sfx/blip2.mp3");             // Menu select
+var lasersfx = new Audio("assets/sfx/laser.ogg");               // Laser shot
+var explosionsfx = new Audio("assets/sfx/explosion.mp3");       // Explosion
+var levelUpsfx = new Audio("assets/sfx/levelUp.mp3");           // Level up
+var hitsfx = new Audio("assets/sfx/hit.mp3");                   // Player hit
+var powerup1sfx = new Audio("assets/sfx/p1.mp3");               // Powerup collection
 
-var GAMESTATES = ["Splash", "Game", "Pause", "GameOver", "Hiscore", "Instructions", "CharSelect"];    // Store the available gamestates
-var currentGameState = GAMESTATES[0];                                   // Store and assign the currently selected gamestate
-var level = 1;
-var levelUpScore = 200;
-var levelIncrement = 400;
+// Game states
+var GAMESTATES = ["Splash", "Game", "Pause", "GameOver", "Hiscore", "Instructions", "CharSelect"];  // Store the available gamestates
+var currentGameState = GAMESTATES[0];                                                               // Store and assign the currently selected gamestate
 
-var RequestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
-window.requestAnimationFrame = RequestAnimationFrame;
+// Level and scoring
+var level = 1;              // Current level
+var levelUpScore = 200;     // Current score to level up
+var levelIncrement = 400;   // Value levelUpScore increments by level
+var score = 0;              // Current score
+var scoreIncrement = 100;   // Score awarded per enemy defeated
+var powerupBonus = 50;      // Score awarded on powerup collection
 
-var mobilePlatform = false;
-// Set dimensions to fullscreen
+// Update definition
+var RequestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;    // Determine browser update function
+window.requestAnimationFrame = RequestAnimationFrame;   // Store determined update function
+
+// Platform
+var mobilePlatform = false;                             // Define current platform
+
+// Window and Canvas layers
+// ---Maximise window
 var width = window.innerWidth;                          // Store the game window's maximised inner width
 var height = window.innerHeight;                        // Store the game window's maximised inner height
-var screenScale = screen.height / 1080;                 // Multiplier to scale drawn elements by
-// Set layers z-index
+var screenScale = screen.height / 950;                 // Multiplier to scale drawn elements by
+// ---Get canvas layer and z-index
 var background = document.getElementById("layer1");     // Absolute background
-var back1 = document.getElementById("layer2");          // Parallax background 1
-var back2 = document.getElementById("layer3");          // Parallax background 2
-//var back3 = document.getElementById("layer4");        // Parallax background 3
-var canvas = document.getElementById("layer5");         // Foreground
-var UI = document.getElementById("layer6");             // UI
-// Set context by layers
+var canvas = document.getElementById("layer2");         // Foreground
+var UI = document.getElementById("layer3");             // UI
+// ---Obtain layer context
 var backgroundCtx = background.getContext("2d");        // Background layer
 var foregroundCtx = canvas.getContext("2d");            // Gameplay layer
 var UICtx = UI.getContext("2d");                        // UI layer
+// ---Set canvas dimensions to window size
+backgroundCtx.canvas.width = width;                     // Background
+backgroundCtx.canvas.height = height;                   //
+foregroundCtx.canvas.width = width;                     // Foreground
+foregroundCtx.canvas.height = height;                   //
+UICtx.canvas.width = width;                             // UI
+UICtx.canvas.height = height;                           //
 
-// Parallax background
-var backgroundImg = new Image();
-var backgroundImg2 = new Image();
-var backgroundIndex = 0;
-var midgroundImg = new Image();
-var foregroundImg = new Image();
-var highwayImg = new Image();
-var treeImg = new Image();
-var p1Img = new Image();
-var p2Img = new Image();
-var scrollSpeed = 5;                                    // Screen scroll speed
-var backgroundScroll = [];                              // Parallax background planes
-var midgroundScroll = [];
-var foregroundScroll = [];
-var treesScroll = [];
-var highwayScroll = [];
-
-// Splash screen values
+// Menu values
 var splashPos = [width / 2, height / 2];                // Set position for splash screen menu text
 var counter = 0;                                        // Animation counter
 var pulseSpeed = 1.5;                                   // Text pulse speed
@@ -77,30 +95,13 @@ var pulseExtent = 20;                                   // Set extent text pulse
 var increase = Math.PI * pulseSpeed / 100;              // Rate counter increases at
 var menuOptions = [];                                   // Array to store the current number of menu options
 var selected = 0;                                       // Iterator to indicate current selected menu option
-var numOptions = [3, 0, 4, 2, 1, 1, 3];                       // Specify number of menu options available for each game state
+var numOptions = [3, 0, 4, 2, 1, 1, 3];                 // Specify number of menu options available for each game state
 
 
 
-// Set window dimensions for all layers
-background.width = width;
-background.height = height;
-canvas.width = width;
-canvas.height = height;
-UI.width = width;
-UI.height = height;
-
-// Set background canvas dimensions
-backgroundCtx.canvas.width = width;   
-backgroundCtx.canvas.height = height;
-foregroundCtx.canvas.width = width;
-foregroundCtx.canvas.height = height;
-UICtx.canvas.width = width;
-UICtx.canvas.height = height;
-
-// Store current and previous frame keystates
-var keys = [];
-var previousKeys = [];
-var isAnimating = false;
+// Keystates
+var keys = [];              // Current keystate
+var previousKeys = [];      // Previous keystate
 
 var objects = [];                   // Array storing all game objects
 // DEFAULT SPRITE DATA
@@ -220,10 +221,6 @@ var enemyBullets = [];
 var groundFriction = 0.8;                 
 var airFriction = 0.85;
 
-var score = 0;
-var scoreIncrement = 100;
-var powerupBonus = 50;
-
 // -Sprite
 var playerImg = new Image();
 var enemyImg = new Image();
@@ -232,8 +229,6 @@ var heartImg = new Image();
 var explosionImg = new Image();
 
 var groundHeight = height - (282 * screenScale);
-var imgCrate = new Image();
-var boxes = [];
 var powerups = [];
 
 
@@ -524,7 +519,6 @@ function Initialise() {
     bulletImg.src = "assets/player/bullet.png";
     enemyImg.src = "assets/enemy/drone.png";
     explosionImg.src = "assets/enemy/explosion.png";
-    imgCrate.src = "RTS_Crate_0.png";
     heartImg.src = "assets/UI/heart.png";
 
     SetPlayerCharacter(2, "idleRight");
@@ -580,40 +574,17 @@ function Initialise() {
     for (var i = 0; i < 7; i++) {
         highwayScroll.push({
             x: i * (384 * screenScale),
-            y: 0,
-            height: 1080,
+            y: height - highwayImg.height * screenScale,
+            height: 303,
             width: 384,
             image: highwayImg
         });
+        console.log(highwayScroll[i].y);
     }
 
     // Initialise menu options length to number of splash screen options
     menuOptions.length = numOptions[0];
 
-
-    //boxes.push({
-    //    x: 120,
-    //    y: 120,
-    //    width: 200,
-    //    height: 200,
-    //    velX: 0,
-    //    velY: 0,
-    //    tag: "box"
-    //});
-    //boxes.push({
-    //    x: 500,
-    //    y: 300,
-    //    width: 200,
-    //    height: 200,
-    //    velX: 0,
-    //    velY: 0,
-    //    tag: "box"
-    //});
-
-    // Add all boxes to objects array
-    for (var i = 0; i < boxes.length; i++) {
-        objects.push(boxes[i]);
-    }
     objects.push(player);
     
     DrawUI();
@@ -719,7 +690,6 @@ function CalculateCollisions() {
             
 
             if (dir != null) {
-                console.log("Collision detected");
                 switch (powerups[i].tag) {
                     case 0:
                         powerup1sfx.currentTime = 0;
@@ -747,18 +717,6 @@ function CalculateCollisions() {
 
     }
 
-    // Box collision
-    for (var i = 0; i < boxes.length; i++) {
-        var dir = colCheck(player, boxes[i]);
-        if (dir === "l" || dir === "r") {
-            player.velX = 0;
-        } else if (dir === "t") {
-            player.velY = 0;
-        } else if (dir === "b") {
-            player.velY = 0;
-            player.isGrounded = true;
-        }
-    }
     // Player bullet collision
     for (var i = 0; i < playerBullets.length; i++) {
         var dir = null;
@@ -1000,7 +958,7 @@ function Generate(object, origin) {
         case "enemy":
             var tempEnemy;
             var enemyData = {
-                x: width * screenScale,
+                x: width,
                 y: groundHeight + 50 * screenScale - ((Math.random() * 300) * screenScale),
                 speed: Math.floor(Math.random() * 5) + scrollSpeed + level,
                 sprite: enemyImg
@@ -1460,7 +1418,6 @@ function ScrollBackground(scrollSpeed) {
     for (var i = 0; i < treesScroll.length; i++) {
         treesScroll[i].x -= scrollSpeed * 0.85;
         if (treesScroll[i].x <= 0 - (treesScroll[i].width * 2 * screenScale)) {
-            console.log("push");
             treesScroll.push({
                 x: treesScroll[treesScroll.length - 1].x + treesScroll[i].width * screenScale,
                 y: 0,
@@ -1478,8 +1435,8 @@ function ScrollBackground(scrollSpeed) {
             highwayScroll.splice(0, 1);
             highwayScroll.push({
                 x: highwayScroll[highwayScroll.length - 1].x + highwayScroll[i].width * screenScale,
-                y: 0,
-                height: 1080,
+                y: height - highwayImg.height * screenScale,
+                height: 303,
                 width: 384,
                 image: highwayImg
             });
@@ -1488,7 +1445,7 @@ function ScrollBackground(scrollSpeed) {
 }
 
 function Update() {
-    requestAnimationFrame(Update);  // Request animation frame update
+    requestAnimationFrame(Update);  // Request update before next repaint
 
 
     now = Date.now();
@@ -1735,19 +1692,13 @@ function DrawBackground() {
     }
     // Parallax: Highway plane
     for (var i = 0; i < highwayScroll.length; i++) {
-        backgroundCtx.drawImage(highwayScroll[i].image, highwayScroll[i].x, 0, highwayScroll[i].width * screenScale, highwayScroll[i].height * screenScale);
+        backgroundCtx.drawImage(highwayScroll[i].image, highwayScroll[i].x, highwayScroll[i].y, highwayScroll[i].width * screenScale, highwayScroll[i].height * screenScale);
     }
 
 }
 
 function DrawCanvas() {
     foregroundCtx.clearRect(0, 0, width, height);
-
-    for (var i = 0; i < boxes.length; i++) {
-        // Draw the boxes to the background
-        //backgroundCtx.rect(boxes[i].x, boxes[i].y, boxes[i].width, boxes[i].height);
-        backgroundCtx.drawImage(imgCrate, boxes[i].x, boxes[i].y, boxes[i].width, boxes[i].height);
-    }
 
 
     //console.log(powerups.length);
