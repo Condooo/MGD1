@@ -16,7 +16,13 @@ var charPort2 = new Image();            //
 var charPort0trans = new Image();       // Character select portraits: transparent:
 var charPort1trans = new Image();       //
 var charPort2trans = new Image();       //
-// Images: Parallax background
+// ---Sprites
+var playerImg = new Image();            // Player
+var enemyImg = new Image();             // Enemy
+var bulletImg = new Image();            // Bullet
+var heartImg = new Image();             // Player health indicator
+var explosionImg = new Image();         // Enemy explosion
+// ---Parallax background
 var backgroundIndex = 0;                // Iterator for background scroll
 var backgroundImg = new Image();        // Parallax background images:
 var backgroundImg2 = new Image();       //
@@ -103,33 +109,33 @@ var numOptions = [3, 0, 4, 2, 1, 1, 3];                 // Specify number of men
 var keys = [];              // Current keystate
 var previousKeys = [];      // Previous keystate
 
-var objects = [];                   // Array storing all game objects
+var objects = [];           // Array storing all game objects
+
 // DEFAULT SPRITE DATA
 var sprite = {
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-    velX: 0,
-    velY: 0,
-    sprite: "",
-    spriteWidth: 0,
-    spriteHeight: 0,
-    isAnimating: true,
-    startTimeMS: 0,
-    frameX: 0,
-    frameXMax: 0,
-    frameY: 0,
-    frameYMax: 0,
-    frame: 0,
-    frameMax: 0,
-    spriteWidth: 0,
-    spriteHeight: 0,
-    frameTimer: 0.05,
-    frameTimeMax: 0.065,
-    tag: ""
+    x: 0,                   // X-position
+    y: 0,                   // Y-position
+    width: 0,               // Draw width
+    height: 0,              // Draw height
+    velX: 0,                // X-velocity
+    velY: 0,                // Y-velocity
+    sprite: "",             // Sprite name
+    spriteWidth: 0,         // Sprite source width
+    spriteHeight: 0,        // Sprite source height
+    isAnimating: true,      // Determine animation state
+    startTimeMS: 0,         // Current time to determine animation speed
+    frame: 0,               // Current frame number
+    frameX: 0,              // Current spritesheet x-position
+    frameY: 0,              // Current spritesheet y-position
+    frameMax: 0,            // Max no. spritesheet positions
+    frameXMax: 0,           // Max no. spritesheet positions on x-axis
+    frameYMax: 0,           // Max no. spritesheet positions on y-axis
+    frameTimer: 0.05,       // Current frame time
+    frameTimeMax: 0.065,    // Max time to increment sprite
+    tag: ""                 // Object tag
 };
 
+// Sprite class
 class Sprite {
     constructor() {
         this.x = 0;
@@ -145,88 +151,82 @@ class Sprite {
     }
 }
 
-// PLAYER DATA
+// DEFAULT PLAYER DATA
 var playerInit = {
-    characterIndex: 0,
-    x: width / 4,                   // Player position: X
-    y: height - 282 * screenScale,                  //                : Y
-    width: 200,                     // Player dimensions: width
-    height: 200,                    //                  : height
-    moveSpeed: 4,
-    jumpForce: 25,
-    health: 3,
-    healthMax: 3,
-    facing: "right",                // Indicates current facing
-    isGrounded: false,
-    isShooting: false,
-    isAnimating: true,
-    isImmune: false,
-    isHurt: false,
-    hurtTimer: 0,
-    hurtTimerMax: 35,
-    immuneTimer: 0,
-    immuneTimerMax: 150,
-    frameXMax: 2,
-    frameYMax: 2,
-    frameMax: 7,
-    shootTimerMax: 20,
-    tag: "player",
-    spriteWidth: 199,
-    spriteHeight: 188,
-    powerup1Active: false,
-    powerup2Active: false,
-    powerup1Timer: 0,
-    powerup1TimerMax: 150,
-    powerup2Timer: 0,
-    powerup2TimerMax: 150
+    characterIndex: 0,              // Determine player character
+    x: width / 4,                   // Player x-position
+    y: height - 282 * screenScale,  // Player y-position
+    width: 200,                     // Draw width
+    height: 200,                    // Draw height
+    moveSpeed: 4,                   // Player movement speed
+    jumpForce: 25,                  // Player jump force
+    health: 3,                      // Player health
+    healthMax: 3,                   // Player max health
+    facing: "right",                // Indicate current facing
+    isGrounded: false,              // Determine if grounded
+    isShooting: false,              // Determine if currently shooting
+    shootTimerMax: 20,              // Max time between shots when fire held
+    isAnimating: true,              // Determine if player sprite animating
+    isImmune: false,                // Determine if currently immune
+    immuneTimer: 0,                 // Timer for immune state
+    immuneTimerMax: 150,            // Max time for immune state
+    isHurt: false,                  // Determine if player is in hurt state
+    hurtTimer: 0,                   // Timer for hurt state
+    hurtTimerMax: 35,               // Max time for hurt state
+    frameMax: 7,                    // Max no. spritesheet positions
+    frameXMax: 2,                   // Max no. spritesheet positions on x-axis
+    frameYMax: 2,                   // Max no. spritesheet positions on y-axis
+    tag: "player",                  // Set object tagged as "player"
+    spriteWidth: 199,               // Source sprite width
+    spriteHeight: 188,              // Source sprite height
+    powerup1Active: false,          // Determine if powerup1 is active
+    powerup2Active: false,          // Determine if powerup2 is active
+    powerup1Timer: 0,               // Current powerup1 timer
+    powerup2Timer: 0,               // Current powerup2 timer
+    powerup1TimerMax: 150,          // Max time for powerup1 active
+    powerup2TimerMax: 150           // Max time for powerup2 active
 };
-var player = Object.assign({}, sprite, playerInit);
+var player = Object.assign({}, sprite, playerInit); // Combine sprite and playerInit objects and assign to player
 
-// ENEMY DATA
+// DEFAULT ENEMY DATA
 var enemyData = {
-    width: 102,
-    height: 144,
-    health: 3,
-    frameXMax: 0,
-    frameYMax: 0,
-    frameMax: 0,
-    tag: "enemy",
-    spriteWidth: 102,
-    spriteHeight: 144,
-    active: true,
-    isExploding: false
+    width: 102,         // Draw width
+    height: 144,        // Draw height
+    health: 3,          // Enemy health
+    frameMax: 0,        // Max no. spritesheet positions
+    frameXMax: 0,       // Max no. spritesheet positions on x-axis
+    frameYMax: 0,       // Max no. spritesheet positions on y-axis
+    tag: "enemy",       // Set object tagged as "enemy"
+    spriteWidth: 102,   // Source sprite width
+    spriteHeight: 144,  // Source sprite height
+    active: true,       // Set object marked for deletion
+    isExploding: false  // Set object as exploding
 };
-var enemy = Object.assign({}, sprite, enemyData);
-var enemies = [];
-var enemySpawnTimer = 0;
-var enemySpawnTimerMax = 50;
+var enemy = Object.assign({}, sprite, enemyData);   // Combine sprite and enemyData objects and assign to enemy
+var enemies = [];                                   // Array to store enemies
+var enemySpawnTimer = 0;                            // Timer to determine enemy spawn
+var enemySpawnTimerMax = 50;                        // Max time to spawn enemy
 
-// BULLET DATA
+// DEFAULT BULLET DATA
 var bullet = {
-    width: 42,
-    height: 31,
-    speed: 20,
-    spriteWidth: 42,
-    spriteHeight: 31,
-    frameXMax: 1,
-    frameYMax: 1,
-    frameMax: 3,
-    active: true
+    width: 42,          // Draw width
+    height: 31,         // Draw height
+    speed: 20,          // Bullet movement speed
+    spriteWidth: 42,    // Source sprite width
+    spriteHeight: 31,   // Source sprite height
+    frameMax: 3,        // Max no. spritesheet positions
+    frameXMax: 1,       // Max no. spritesheet positions on x-axis
+    frameYMax: 1,       // Max no. spritesheet positions on y-axis
+    active: true        // Set object marked for deletion
 }
-bullet = Object.assign({}, sprite, bullet);
-var playerBullets = [];
-var enemyBullets = [];
+bullet = Object.assign({}, sprite, bullet); // Combine sprite and bullet objects and assign to bullet
+var playerBullets = [];                     // Array to store player bullets
+var enemyBullets = [];                      // Array to store enemy bullets
 
 // Rate at which velocity decreases
 var groundFriction = 0.8;                 
 var airFriction = 0.85;
 
-// -Sprite
-var playerImg = new Image();
-var enemyImg = new Image();
-var bulletImg = new Image();
-var heartImg = new Image();
-var explosionImg = new Image();
 
 var groundHeight = height - (282 * screenScale);
 var powerups = [];
