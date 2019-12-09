@@ -119,6 +119,8 @@ var sprite = {
     height: 0,              // Draw height
     velX: 0,                // X-velocity
     velY: 0,                // Y-velocity
+    prevVelX: 0,            // Previous x-velocity
+    prevVelY: 0,            // Previous y-velocity
     sprite: "",             // Sprite name
     spriteWidth: 0,         // Sprite source width
     spriteHeight: 0,        // Sprite source height
@@ -222,98 +224,99 @@ var bullet = {
 bullet = Object.assign({}, sprite, bullet); // Combine sprite and bullet objects and assign to bullet
 var playerBullets = [];                     // Array to store player bullets
 var enemyBullets = [];                      // Array to store enemy bullets
+var powerups = [];                          // Array to store spawned powerups
 
 // Rate at which velocity decreases
-var groundFriction = 0.8;                 
-var airFriction = 0.85;
+var groundFriction = 0.8;                   // When grounded
+var airFriction = 0.85;                     // When airborne
 
 
-var groundHeight = height - (282 * screenScale);
-var powerups = [];
+var groundHeight = height - (282 * screenScale);    // Define ground height position on screen
 
-
+// Particle system
 class Particle {
     constructor() {
-        this.x = 0;
-        this.y = 0;
-        this.velX = Math.floor(Math.random() * 50) - 25;
-        this.velY = Math.floor(Math.random() * 50) - 25;
-        this.r = 255;
-        this.g = Math.floor(Math.random() * 50) + 100;
-        this.b = Math.floor(Math.random() * 50) + 100;
-        this.alpha = 1.0;
-        this.fillStyle = "rbga(" + this.r + "," + this.g + ",0,1.0)";
+        this.x = 0;                                                         // X-position
+        this.y = 0;                                                         // Y-position
+        this.velX = Math.floor(Math.random() * 50) - 25;                    // Set random x-velocity
+        this.velY = Math.floor(Math.random() * 50) - 25;                    // Set random y-velocity
+        this.r = 255;                                                       // Set colour value: red
+        this.g = Math.floor(Math.random() * 50) + 100;                      //                 : green
+        this.b = Math.floor(Math.random() * 50) + 100;                      //                 : blue
+        this.alpha = 1.0;                                                   //                 : alpha
+        this.fillStyle = "rbga(" + this.r + "," + this.g + "," + this.b + "," + this.alpha+")";       // Combine colour values as fill style
     }
 
+    // Generate particle cluster
     generate(x, y, numParticles) {
-        for (var i = 0; i < numParticles; i++) {
-            var p = new Particle();
-            p.x = x;
-            p.y = y;
-            p.velX *= 0.2;
-            p.velY *= 0.2;
-            particles.push(p);
+        for (var i = 0; i < numParticles; i++) {    // Iterate through specified number of particles
+            var p = new Particle();                 // Declare new particle
+            p.x = x;                                // Assign: x-position
+            p.y = y;                                //       : y-position
+            p.velX *= 0.2;                          //       : x-velocity
+            p.velY *= 0.2;                          //       : y-velocity
+            particles.push(p);                      // Add particle to array
         }
     }
 
+    // Update function
     update() {
-        this.x += this.velX;
-        this.y += this.velY;
-        this.velX *= 0.995;
-        this.velY *= 0.995;
-        this.alpha -= 0.015;
-        this.x -= scrollSpeed;
-        //console.log(this.alpha);
+        this.x += this.velX;                        // Update: x-position by velocity
+        this.y += this.velY;                        //       : y-position
+        this.velX *= 0.995;                         // Slow particle over time
+        this.velY *= 0.995;                         //
+        this.alpha -= 0.015;                        // Fade particle out over time
+        this.x -= scrollSpeed;                      // Move particle by screen scroll speed
     }
 
-    fillStyle() {
-        return this.fillStyle;
+    getFillStyle() {
+        return this.fillStyle;                      // Return fill style
     }
 
+    // Draw function
     Draw(ctx) {
-        ctx.beginPath();
-        //ctx.arc(this.x, this.y, 5 * screenScale, 0, 2 * Math.PI);
-        ctx.fillRect(this.x, this.y, 5 * screenScale, 5 * screenScale);
-        ctx.fill();
+        ctx.beginPath();                                                // Start shape
+        ctx.fillRect(this.x, this.y, 5 * screenScale, 5 * screenScale); // Draw rectangle at position
     }
 }
-var p = new Particle();
-let particles = [];
+var p = new Particle(); // Particle base object
+let particles = [];     // Array to store particles
 
-// Run setup when loaded
+// Run setup on loaded
 window.addEventListener("load", function () {
+    // Determine if using mobile platform
     if (DetectMobile())
         mobilePlatform = true;
-    Initialise();
-    Update();
+    Initialise();               // Initialise game
+    Update();                   // First update
 });
 
 
 
-// Set keydown
+// Set keystate on key down
 document.body.addEventListener("keydown", function (e) {
     keys[e.keyCode] = true;
 });
 
-// Set keyup
+// Set keystate on key up
 document.body.addEventListener("keyup", function (e) {
     keys[e.keyCode] = false;
 });
 
-
+// Determine mobile platform
 function DetectMobile() {
-    if (navigator.userAgent.match(/Android/i)
-        || navigator.userAgent.match(/webOS/i)
-        || navigator.userAgent.match(/iPhone/i)
-        || navigator.userAgent.match(/iPad/i)
-        || navigator.userAgent.match(/iPod/i)
-        || navigator.userAgent.match(/BlackBerry/i)
-        || navigator.userAgent.match(/Windows Phone/i)
-    ) {
-        return true;
+    if (navigator.userAgent.match(/Android/i)           // Android
+        || navigator.userAgent.match(/webOS/i)          // webOS
+        || navigator.userAgent.match(/iPhone/i)         // iOs
+        || navigator.userAgent.match(/iPad/i)           //
+        || navigator.userAgent.match(/iPod/i)           //
+        || navigator.userAgent.match(/BlackBerry/i)     // Blackberry
+        || navigator.userAgent.match(/Windows Phone/i)  // Windows Phone
+    ) {                                                 //
+        return true;                                    // Return mobile platform being used
     }
     else {
-        return false;
+        return false;                                   // No mobile platform being used
     }
 }
 
@@ -326,6 +329,7 @@ function KeyDown(keycode) {
     else
         return false;
 }
+
 // Compares keyboard states and returns true only once on key up
 function KeyUp(keycode) {
     if (!keys[keycode] && keys[keycode] != previousKeys[keycode]) {
@@ -336,10 +340,11 @@ function KeyUp(keycode) {
         return false;
 }
 
+// Set player character from character selection
 function SetPlayerCharacter(characterIndex) {
-    player.characterIndex = characterIndex;
-    SetPlayerSprite(characterIndex, "idleRight");
-    switch (characterIndex) {
+    player.characterIndex = characterIndex;         // Character index
+    SetPlayerSprite(characterIndex, "idleRight");   // Initialise player sprite as "idleRight" according to character index
+    switch (characterIndex) {                       // Specify sprite source width and height according to character index
         case 0:
             player.spriteWidth = 199;
             player.spriteHeight = 188;
@@ -363,121 +368,123 @@ function SetPlayerCharacter(characterIndex) {
     }
 }
 
+// Change player sprite
 function SetPlayerSprite(characterIndex, sprite) {
-    player.sprite = sprite;
-    var tempSprite = sprite;
+    player.sprite = sprite;     // Update current sprite
+    var tempSprite = sprite;    // Store temporary sprite
 
 
     // Return to start of spritesheet
+    player.frame = 0;
     player.frameX = 0;
     player.frameY = 0;
-    player.frame = 0;
 
+    // Set spritesheet size by character index and sprite state
     switch (characterIndex) {
-        case 0:
-            if (sprite == "runRight" || sprite == "runLeft") {
+        case 0:                                                                     // CHARACTER 1: VELA
+            if (sprite == "runRight" || sprite == "runLeft") {                      // ---Run
                 player.frameMax = 7;
                 player.frameXMax = 2;
                 player.frameYMax = 2;
             }
-            else if (sprite == "idleLeft" || sprite == "idleRight") {
+            else if (sprite == "idleLeft" || sprite == "idleRight") {               // ---Idle
                 player.frameMax = 3;
                 player.frameXMax = 1;
                 player.frameYMax = 1;
             }
-            else if (sprite == "runShootRight" || sprite == "runShootLeft") {
+            else if (sprite == "runShootRight" || sprite == "runShootLeft") {       // ---Run/shoot
                 player.frameMax = 7;
                 player.frameXMax = 2;
                 player.frameYMax = 2;
             }
-            else if (sprite == "shootRight" || sprite == "shootLeft") {
+            else if (sprite == "shootRight" || sprite == "shootLeft") {             // ---Static shoot
                 player.frameMax = 0;
                 player.frameXMax = 0;
                 player.frameYMax = 0;
             }
-            else if (sprite == "jumpLeft" || sprite == "jumpRight") {
+            else if (sprite == "jumpLeft" || sprite == "jumpRight") {               // ---Jump
                 player.frameMax = 2;
                 player.frameXMax = 1;
                 player.frameYMax = 1;
             }
-            else if (sprite == "jumpShootLeft" || sprite == "jumpShootRight") {
+            else if (sprite == "jumpShootLeft" || sprite == "jumpShootRight") {     // ---Jump/shoot
                 player.frameMax = 0;
                 player.frameXMax = 0;
                 player.frameYMax = 0;
             }
             break;
-        case 1:
-            if (sprite == "runRight" || sprite == "runLeft") {
+        case 1:                                                                     // CHARACTER 2: QUINN
+            if (sprite == "runRight" || sprite == "runLeft") {                      // ---Run
                 player.frameMax = 7;
                 player.frameXMax = 7;
                 player.frameYMax = 0;
             }
-            else if (sprite == "idleLeft" || sprite == "idleRight") {
+            else if (sprite == "idleLeft" || sprite == "idleRight") {               // ---Idle
                 player.frameMax = 3;
                 player.frameXMax = 3;
                 player.frameYMax = 0;
             }
-            else if (sprite == "runShootRight" || sprite == "runShootLeft") {
+            else if (sprite == "runShootRight" || sprite == "runShootLeft") {       // ---Run/shoot
                 player.frameMax = 7;
                 player.frameXMax = 7;
                 player.frameYMax = 0;
             }
-            else if (sprite == "shootRight" || sprite == "shootLeft") {
+            else if (sprite == "shootRight" || sprite == "shootLeft") {             // ---Static shoot
                 player.frameMax = 0;
                 player.frameXMax = 0;
                 player.frameYMax = 0;
             }
-            else if (sprite == "jumpLeft" || sprite == "jumpRight") {
-                tempSprite = sprite;
-                if (sprite == "jumpLeft") {
-                    if (player.velY < 0)
-                        sprite = "jumpLeftUp";
-                    else
-                        sprite = "jumpLeftDown";
+            else if (sprite == "jumpLeft" || sprite == "jumpRight") {               // ---Jump
+                tempSprite = sprite;                                                //      -Store current sprite
+                if (sprite == "jumpLeft") {                                         // Left facing:
+                    if (player.velY < 0)                                            // If moving up, assign sprite:
+                        sprite = "jumpLeftUp";                                      //      ---Jump up
+                    else                                                            //
+                        sprite = "jumpLeftDown";                                    //      ---Jump down
                 }
-                else {
-                    if (player.velY < 0)
-                        sprite = "jumpRightUp";
-                    else
-                        sprite = "jumpRightDown";
+                else {                                                              // Right facing:
+                    if (player.velY < 0)                                            // If moving down, assign sprite:
+                        sprite = "jumpRightUp";                                     //      ---Jump up
+                    else                                                            //
+                        sprite = "jumpRightDown";                                   //      ---Jump down
                 }
                 player.frameMax = 0;
                 player.frameXMax = 0;
                 player.frameYMax = 0;
             }
-            else if (sprite == "jumpShootLeft" || sprite == "jumpShootRight") {
+            else if (sprite == "jumpShootLeft" || sprite == "jumpShootRight") {     // ---Jump/shoot
                 player.frameMax = 0;
                 player.frameXMax = 0;
                 player.frameYMax = 0;
             }
             break;
-        case 2:
-            if (sprite == "runRight" || sprite == "runLeft") {
+        case 2:                                                                     // CHARACTER 2: PYXEL
+            if (sprite == "runRight" || sprite == "runLeft") {                      // ---Run
                 player.frameMax = 11;
                 player.frameXMax = 11;
                 player.frameYMax = 0;
             }
-            else if (sprite == "idleLeft" || sprite == "idleRight") {
+            else if (sprite == "idleLeft" || sprite == "idleRight") {               // ---Idle
                 player.frameMax = 3;
                 player.frameXMax = 1;
                 player.frameYMax = 1;
             }
-            else if (sprite == "runShootRight" || sprite == "runShootLeft") {
+            else if (sprite == "runShootRight" || sprite == "runShootLeft") {       // ---Run/shoot
                 player.frameMax = 11;
                 player.frameXMax = 3;
                 player.frameYMax = 2;
             }
-            else if (sprite == "shootRight" || sprite == "shootLeft") {
+            else if (sprite == "shootRight" || sprite == "shootLeft") {             // ---Idle/shoot
                 player.frameMax = 0;
                 player.frameXMax = 0;
                 player.frameYMax = 0;
             }
-            else if (sprite == "jumpLeft" || sprite == "jumpRight") {
+            else if (sprite == "jumpLeft" || sprite == "jumpRight") {               // ---Jump
                 player.frameMax = 7;
                 player.frameXMax = 2;
                 player.frameYMax = 2;
             }
-            else if (sprite == "jumpShootLeft" || sprite == "jumpShootRight") {
+            else if (sprite == "jumpShootLeft" || sprite == "jumpShootRight") {     // ---Jump/shoot
                 player.frameMax = 0;
                 player.frameXMax = 0;
                 player.frameYMax = 0;
@@ -487,55 +494,60 @@ function SetPlayerSprite(characterIndex, sprite) {
             break;
     }
 
-    playerImg.src = "assets/player/character" + player.characterIndex + "/" + sprite + ".png";
-    player.sprite = tempSprite;
+    playerImg.src = "assets/player/character" + player.characterIndex + "/" + sprite + ".png";  // Load appropriate sprite
+    player.sprite = tempSprite;                                                                 // Return to assigned sprite
 }
 
+// TODO Add enemy types
 function SetEnemySprite(i) {
-    enemies[i].sprite = explosionImg;
-    enemies[i].frameXMax = 2;
-    enemies[i].frameYMax = 1;
-    enemies[i].frameMax = 5;
-    enemies[i].width = 152;
-    enemies[i].height = 144;
-    enemies[i].spriteWidth = 152;
-    enemies[i].spriteHeight = 144;
-    enemies[i].isExploding = true;
+    // Set enemy values
+    // ---Exploding
+    enemies[i].sprite = explosionImg;   // Change to explosion spritesheet
+    enemies[i].frameMax = 5;            // Set spritesheet dimensions
+    enemies[i].frameXMax = 2;           //
+    enemies[i].frameYMax = 1;           //
+    enemies[i].width = 152;             // Draw width
+    enemies[i].height = 144;            // Draw height
+    enemies[i].spriteWidth = 152;       // Sprite source width
+    enemies[i].spriteHeight = 144;      // Sprite source height
+    enemies[i].isExploding = true;      // Set to exploding
 }
 
 
 function Initialise() {
     // Load music and SFX
-    BGM.play();
+    BGM.play();                                                             // Play background music on start
 
     // Load images from file
-    titleImg.src = "title.png";
-    backgroundImg.src = "skyline-a.png";
-    backgroundImg2.src = "skyline-b.png";
-    midgroundImg.src = "midground.png";
-    foregroundImg.src = "foreground.png";
-    highwayImg.src = "assets/environment/highway.png";
-    treeImg.src = "assets/environment/tree.png";
-    bulletImg.src = "assets/player/bullet.png";
-    enemyImg.src = "assets/enemy/drone.png";
-    explosionImg.src = "assets/enemy/explosion.png";
-    heartImg.src = "assets/UI/heart.png";
+    titleImg.src = "title.png";                                             // Splash screen title image
+    backgroundImg.src = "skyline-a.png";                                    // Parallax background: 1
+    backgroundImg2.src = "skyline-b.png";                                   //      2
+    midgroundImg.src = "midground.png";                                     //      Midground
+    foregroundImg.src = "foreground.png";                                   //      Foreground
+    highwayImg.src = "assets/environment/highway.png";                      //      Highway
+    treeImg.src = "assets/environment/tree.png";                            //      Treeline
+    bulletImg.src = "assets/player/bullet.png";                             // Bullet
+    enemyImg.src = "assets/enemy/drone.png";                                // Enemy 1
+    explosionImg.src = "assets/enemy/explosion.png";                        // Explosion
+    heartImg.src = "assets/UI/heart.png";                                   // Health indicator
 
-    SetPlayerCharacter(2, "idleRight");
-    charPort0.src = "assets/player/character0/portrait.png";
-    charPort1.src = "assets/player/character1/portrait.png";
-    charPort2.src = "assets/player/character2/portrait.png";
-    charPort0trans.src = "assets/player/character0/portraitTrans.png";
-    charPort1trans.src = "assets/player/character1/portraitTrans.png";
-    charPort2trans.src = "assets/player/character2/portraitTrans.png";
+    charPort0.src = "assets/player/character0/portrait.png";                // Character portrait: VELA
+    charPort1.src = "assets/player/character1/portrait.png";                //      QUINN
+    charPort2.src = "assets/player/character2/portrait.png";                //      PYXEL
+    charPort0trans.src = "assets/player/character0/portraitTrans.png";      //      VELA (TRANSPARENT)
+    charPort1trans.src = "assets/player/character1/portraitTrans.png";      //      QUINN (TRANSPARENT)
+    charPort2trans.src = "assets/player/character2/portraitTrans.png";      //      PYXEL (TRANSPARENT)
 
-    p1Img.src = "assets/props/powerup1.png";
-    p2Img.src = "assets/props/powerup2.png";
+    p1Img.src = "assets/props/powerup1.png";                                // Powerup 1
+    p2Img.src = "assets/props/powerup2.png";                                // Powerup 2
 
-    ResetLevel();
+    SetPlayerCharacter(0, "idleRight");                                     // Initialise player sprite
+    
+    ResetLevel();                                           // Set initial game values
 
+    // DRAW INITIAL PARALLAX BACKGROUND
     // Parallax: Background
-    for (var i = 0; i < 7; i++) {
+    for (var i = 0; i < 7; i++) {                           
         backgroundScroll.push({
             x: i * (469 * screenScale),
             y: 0,
@@ -558,7 +570,6 @@ function Initialise() {
             image: foregroundImg
         });
     }
-
     // Parallax: Trees
     for (var i = 0; i < 15; i++) {
         treesScroll.push({
@@ -569,7 +580,6 @@ function Initialise() {
             image: treeImg
         });
     }
-
     // Parallax: Highway
     for (var i = 0; i < 7; i++) {
         highwayScroll.push({
@@ -579,19 +589,18 @@ function Initialise() {
             width: 384,
             image: highwayImg
         });
-        console.log(highwayScroll[i].y);
     }
 
-    // Initialise menu options length to number of splash screen options
-    menuOptions.length = numOptions[0];
+    menuOptions.length = numOptions[0];     // Initialise menu options length to number of splash screen options
 
-    objects.push(player);
+    objects.push(player);                   // Add player to object array
     
-    DrawUI();
+    DrawUI();                               // Draw UI to screen
 }
 
+// Check for collision between 2 objects
 function colCheck(shapeA, shapeB, isTrigger) {
-    // get the vectors to check against
+    // Get vectors to check against
     var vX = (shapeA.x + (shapeA.width / 2)) - (shapeB.x + (shapeB.width / 2)),     // Distance between objects on the X-axis
         vY = (shapeA.y + (shapeA.height / 2)) - (shapeB.y + (shapeB.height / 2)),   // Distance between objects on the Y-axis
         // Add the half widths and half heights of the objects
@@ -605,52 +614,51 @@ function colCheck(shapeA, shapeB, isTrigger) {
         var oX = hWidths - Math.abs(vX),     // How far the objects are colliding within each other on X-axis        (overlap on X-axis)
             oY = hHeights - Math.abs(vY);    // How far the objects are colliding within each other on the Y-axis    (overlap on Y-axis)
 
-        if (oX >= oY) {             // Check if the object overlap is greater on the X-axis         (Collision more likely in direction with less overlap)
-            if (vY > 0) {           // Check if object A is above object B
-                colDir = "t";       // Set collision direction as Top
+        if (oX >= oY) {                     // Check if the object overlap is greater on the X-axis         (Collision more likely in direction with less overlap)
+            if (vY > 0) {                   // Check if object A is above object B
+                colDir = "t";               // Set collision direction as Top
                 if (!isTrigger)
-                    shapeA.y += oY;     // Offset object A away from object B up by the Y-overlap
+                    shapeA.y += oY;         // Offset object A away from object B up by the Y-overlap
             } else {
-                colDir = "b";       // Set collision direction as Bottom
+                colDir = "b";               // Set collision direction as Bottom
                 if (!isTrigger)
-                    shapeA.y -= oY;     // Offset object A away from object B down by the Y-overlap
+                    shapeA.y -= oY;         // Offset object A away from object B down by the Y-overlap
             }
-        } else {                    // ELSE if the object overlap is greater on the Y-axis
-            if (vX > 0) {           // Check if object A is to the right of object B
-                colDir = "l";       // Set collision direction as Left
+        } else {                            // ELSE if the object overlap is greater on the Y-axis
+            if (vX > 0) {                   // Check if object A is to the right of object B
+                colDir = "l";               // Set collision direction as Left
                 if (!isTrigger)
-                    shapeA.x += oX;     // Offset object A away from object B left by the X-overlap
+                    shapeA.x += oX;         // Offset object A away from object B left by the X-overlap
             } else {
-                colDir = "r";       // Set collision direction as Right
+                colDir = "r";               // Set collision direction as Right
                 if (!isTrigger)
-                    shapeA.x -= oX;     // Offset object A away from object B right by the overlap
+                    shapeA.x -= oX;         // Offset object A away from object B right by the overlap
             }
         }
     }
 
-    return colDir;                  // Return the collision direction
+    return colDir;                          // Return the collision direction
 }
 
+// Update sprite animation frame
 function AnimationFrame(object) {
-    var elapsed = (Date.now() - object.startTimeMS) / 1000;
-    object.startTimeMS = Date.now();
+    var elapsed = (Date.now() - object.startTimeMS) / 1000; // Calculate time elapsed since last frame in ms
+    object.startTimeMS = Date.now();                        // Set current time
 
-    //only update frames when timer is below 0
-    object.frameTimer = object.frameTimer - elapsed;
-    if (object.frameTimer <= 0) {
+    object.frameTimer = object.frameTimer - elapsed;        // Reduce timer by elapsed time
+    if (object.frameTimer <= 0) {                           // Update frame when timer reaches 0
         object.frameTimer = object.frameTimeMax;
         object.frameX++;
-        if (object.frameX > object.frameXMax) {
+        if (object.frameX > object.frameXMax) {             // Return to first x-position when end of row reached
             object.frameX = 0;
             object.frameY++;
             //end of row, move down to next row in sheet
-            if (object.frameY > object.frameYMax) {
+            if (object.frameY > object.frameYMax) {         // Return to first y-position when end of column reached
                 object.frameY = 0;
             }
         }
         object.frame++;
-        // Reset frames to 0 if empty spaces on sprite sheet
-        if (object.frame > object.frameMax) {
+        if (object.frame > object.frameMax) {               // Return to first spritesheet position when end of sheet reached (skip empty frames)
             object.frame = 0;
             object.frameX = 0;
             object.frameY = 0;
@@ -659,15 +667,16 @@ function AnimationFrame(object) {
 
 }
 
+// Calculate all collisions
 function CalculateCollisions() {
-    // Screen edge collision
-    if (player.x <= 0)                           // Left edge
+    // Player/Screen edge collision
+    if (player.x <= 0)                              // Left edge
     {
         player.x = 0;
     }
-    if (player.x > (width - player.width))      // Right edge
+    if (player.x > (width - player.width))          // Right edge
         player.x = (width - player.width);
-    if (player.y < 0) {                         // Top edge
+    if (player.y < 0) {                             // Top edge
         player.y = 0;
         player.velY = 0;
     }
@@ -676,38 +685,37 @@ function CalculateCollisions() {
         player.velY = 0;
         player.isGrounded = true;
     }
-    for (var i = 0; i < powerups.length; i++) {
-        if (powerups[i].y > (height - powerups[i].height * screenScale - 65 * screenScale)) {
+
+    // Powerups
+    for (var i = 0; i < powerups.length; i++) {     
+        if (powerups[i].y > (height - powerups[i].height * screenScale - 65 * screenScale)) {   // Ground collision  
             powerups[i].y = (height - powerups[i].height * screenScale - 65 * screenScale)
             powerups[i].velY = 0;
         }
-        if (powerups[i].x < 0 - powerups[i].width * screenScale)
+        if (powerups[i].x < 0 - powerups[i].width * screenScale)    // Delete powerup when off screen
             powerups.splice(i, 1);
 
         var dir = null;
-        if (powerups.length > 0) {
+        if (powerups.length > 0) {                      // Check for player/powerup collision if powerup array isn't empty
             dir = colCheck(player, powerups[i], true);
             
 
-            if (dir != null) {
+            if (dir != null) {                          // If collision detected
                 switch (powerups[i].tag) {
-                    case 0:
+                    case 0:                             // Activate Powerup 1
                         powerup1sfx.currentTime = 0;
                         powerup1sfx.play();
                         player.powerup1Active = true;
                         player.powerup1Timer = 0;
                         powerups.splice(i, 1);
-                        //console.log("powerup 1 actice: " + powerup1Active);
-                        // TODO Powerup 1
                         break;
-                    case 1:
+                    case 1:                             // Activate Powerup 2
                         powerup1sfx.currentTime = 0;
                         powerup1sfx.play();
                         player.shootTimerMax = 5;
                         player.powerup2Active = true;
                         player.powerup2Timer = 0;
                         powerups.splice(i, 1);
-                        // TODO Powerup 2
                         break;
                     default:
                         break;
@@ -720,48 +728,42 @@ function CalculateCollisions() {
     // Player bullet collision
     for (var i = 0; i < playerBullets.length; i++) {
         var dir = null;
-        var enemyIndex;
         for (var j = 0; j < enemies.length; j++) {
             if (enemies[j] != null && playerBullets[i] != null && !enemies[j].isExploding) {
-                dir = colCheck(enemies[j], playerBullets[i], true);
+                dir = colCheck(enemies[j], playerBullets[i], true); // Detect collision if enemy and playerBullets arrays aren't empty and enemy isn't exploding
             }
-            if (dir != null) {                                      // Set hit enemies as inactive
-                explosionsfx.currentTime = 0;
-                explosionsfx.play();
-                SetEnemySprite(j);
-                playerBullets[i].active = false;
-                score += scoreIncrement;
-                var rng = Math.floor(Math.random() * 100);
-                if (rng < 5) {
-                    Generate("powerup", enemies[j]);
-                    score += powerupBonus;
+            if (dir != null) {                                      // On collision detected
+                explosionsfx.currentTime = 0;                       // Reset explosion SFX
+                explosionsfx.play();                                // Play explosion SFX
+                SetEnemySprite(j);                                  // Set iterated enemy as exploding
+                playerBullets[i].active = false;                    // Mark player bullet for deletion
+                score += scoreIncrement;                            // Increment score
+                var rng = Math.floor(Math.random() * 100);          // Powerup rng
+                if (rng < 5) {                                      // 5% chance to spawn powerup on enemy defeat
+                    Generate("powerup", enemies[j]);                //      Generate powerup
+                    score += powerupBonus;                          //      Add powerup bonus
                 }
                 if (enemies.length > 0)
-                    p.generate(enemies[j].x + enemies[j].width / 2, enemies[i].y + enemies[i].height/2, 50);
-                if (score > levelUpScore) {
-                    level++;
-                    levelUpScore += (levelIncrement * level);
-                    levelUpsfx.currentTime = 0;
-                    levelUpsfx.play();
-                    if (player.health < player.healthMax)
-                        player.health++;
+                    p.generate(enemies[j].x + enemies[j].width / 2, enemies[i].y + enemies[i].height/2, 50);    // Generate explosion particle effect on enemy position
+                if (score > levelUpScore) {                         
+                    LevelUp();  // Level up when level up score reached
                 }
             }
         }
     }
 
-    for (var i = 0; i < enemies.length; i++) {
+    for (var i = 0; i < enemies.length; i++) {          // Iterate through all enemies
         if (!enemies[i].isExploding) {
             var dir = null;
-            dir = colCheck(player, enemies[i], true);
+            dir = colCheck(player, enemies[i], true);   // Check for player/enemy collision if enemy isn't exploding
             if (dir != null) {
                 if (!player.isImmune) {
-                    player.health--;
+                    player.health--;                    // Reduce player health on collision
                     if (player.health <= 0)
-                        ChangeState(3);
-                    player.isImmune = true;
-                    player.isHurt = true;
-                    hitsfx.play();
+                        ChangeState(3);                 // Game Over if player health reaches 0
+                    player.isImmune = true;             // Set player temporary immunity on hit
+                    player.isHurt = true;               // Set player to hurt state
+                    hitsfx.play();                      // Play hit SFX
                 }
             }
         }
@@ -780,41 +782,46 @@ function CalculateCollisions() {
     }
 }
 
-//function DestroyEnemy(enemyIndex, bulletIndex) {
-//    playerBullets.splice(bulletIndex, 1);
-//    enemies.splice(enemyIndex, 1);
-//}
+// Level up
+function LevelUp() {
+    level++;                                    // Increase level
+    levelUpScore += (levelIncrement * level);   // Increase next level up score to reach by level increment multiplied by the current level
+    levelUpsfx.currentTime = 0;                 // Reset level up SFX
+    levelUpsfx.play();                          // Play level up SFX
+    if (player.health < player.healthMax)       //
+        player.health++;                        // Restore player health if below max health
+}
 
 // Apply gravity to all objects stored in objects array
 function ApplyGravity() {
     for (var i = 0; i < objects.length; i++) {
         objects[i].velY += 1;
         objects[i].y += objects[i].velY;
-        objects[i].x -= scrollSpeed;
+        objects[i].x -= scrollSpeed;            // Scroll all objects across screen by scroll speed
     }
 }
 
+// Handle player sprite input
 function PlayerControl() {
     if (mobilePlatform) {                                       // Mobile Input Handler
         // TODO: Mobile input
     }
     else {                                                      // PC Input Handler
-        if (keys[13]) {
+        if (keys[13]) {                                         // ENTER:
 
         }
         else
             player.isShooting = false;
         if (keys[83] && player.isGrounded) {                    // S: Down
-            //if (player.y < (canvas.height - player.height))
-
+            // TODO: Crouch
         }
         if (keys[32]) {                                         // SPACE: Shoot
             player.isShooting = true;
         }
         if (keys[68]) {                                         // D: Right
             if (!player.isShooting)
-                player.facing = "right";
-            if (player.isGrounded) {
+                player.facing = "right";                        
+            if (player.isGrounded) {                            // Set appropriate sprite
                 if (player.isShooting) {
                     if (player.sprite != "runShootRight")
                         SetPlayerSprite(player.characterIndex,"runShootRight");
@@ -823,28 +830,23 @@ function PlayerControl() {
                     SetPlayerSprite(player.characterIndex, "runRight");
             }
             if (player.x < (width) - player.width)
-                player.velX += player.moveSpeed;
+                player.velX += player.moveSpeed;                // Increase player speed if within screen bounds
             else
-                player.velX = 0;
+                player.velX = 0;                                // Otherwise stop movement
         }
         if (keys[65]) {                                         // A: Left
             if (!player.isShooting)
                 player.facing = "left";
-            if (player.isGrounded) {
-                //if (player.isShooting) {
-                //    if (player.sprite != "runShootLeft")
-                //        SetPlayerSprite("runShootLeft");
-                //}
-                //else
+            if (player.isGrounded) {                            // Set appropriate sprite
                     if (player.sprite != "runLeft")
                         SetPlayerSprite(player.characterIndex,"runLeft");
             }
-            if (player.x > 0)
+            if (player.x > 0)                                   // Increase player speed if within screen bounds
                 player.velX -= player.moveSpeed;
             else
-                player.velX = 0;
+                player.velX = 0;                                // Otherwise stop movement
         }
-        if (!keys[68] && !keys[65]) {
+        if (!keys[68] && !keys[65]) {                           
             if (player.isShooting) {
                 if (player.isGrounded) {
                     if (player.x > 0) {
@@ -852,24 +854,24 @@ function PlayerControl() {
                         if (player.facing == "right") {
                             var sprite = "shootRight";
                             if (player.sprite != sprite) {
-                                SetPlayerSprite(player.characterIndex,sprite);
+                                SetPlayerSprite(player.characterIndex,sprite);      // Set sprite to shoot right if grounded, shooting and idle
                             }
                         }
                     }
                     else if (player.sprite != "runShootRight")
-                        SetPlayerSprite(player.characterIndex,"runShootRight");
+                        SetPlayerSprite(player.characterIndex,"runShootRight");     // Set sprite to run/shoot right if grounded, shooting and at screen edge
                 }
             }
             else {
                 if (player.isGrounded)
                     if (player.x > 0) {
                         if (player.sprite != "idleRight") {
-                            SetPlayerSprite(player.characterIndex,"idleRight");
+                            SetPlayerSprite(player.characterIndex,"idleRight");     // Set sprite to idle right if grounded, NOT shooting and idle
                             player.facing = "right";
                         }
                     }
                     else if (player.sprite != "runRight") {
-                        SetPlayerSprite(player.characterIndex,"runRight");
+                        SetPlayerSprite(player.characterIndex,"runRight");          // Set sprite to run right if grounded, NOT shooting and at screen edge
                         player.facing = "right";
                     }
             }
@@ -878,29 +880,33 @@ function PlayerControl() {
         if (!player.isGrounded) {
             if (player.facing == "right") {
                 if (!player.isShooting) {
+                    if (player.velY > 0 && player.prevVelY <= 0)
+                        SetPlayerSprite(player.characterIndex, "jumpRight");        // Set sprite is airborne and not shooting
                     if (player.sprite != "jumpRight")
                         SetPlayerSprite(player.characterIndex,"jumpRight");
                 }
                 else {
                     if (player.sprite != "jumpShootRight")
-                        SetPlayerSprite(player.characterIndex,"jumpShootRight");
+                        SetPlayerSprite(player.characterIndex,"jumpShootRight");    // Set sprite if airborne and shooting
                 }
             }
             else {
                 if (!player.isShooting) {
+                    if (player.velY > 0 && player.prevVelY <= 0)
+                        SetPlayerSprite(player.characterIndex, "jumpLeft");         // Set sprite if falling
                     if (player.sprite != "jumpLeft")
-                        SetPlayerSprite(player.characterIndex,"jumpLeft");
+                        SetPlayerSprite(player.characterIndex,"jumpLeft");          // Set sprite if airborne
                 }
                 else {
                     if (player.sprite != "jumpShootLeft")
-                        SetPlayerSprite(player.characterIndex,"jumpShootLeft");
+                        SetPlayerSprite(player.characterIndex,"jumpShootLeft");     // Set sprite if airborne and shooting
                 }
             }
 
         }        
 
-        if (keys[87] && !previousKeys[87] && player.isGrounded) { // Space: Jump
-            if (player.y > 0) {
+        if (keys[87] && !previousKeys[87] && player.isGrounded) {                   // Space:
+            if (player.y > 0) {                                                     // Jump if grounded and within screen bounds
                 player.velY -= player.jumpForce;
                 player.isGrounded = false;
             }
@@ -921,7 +927,7 @@ function PlayerControl() {
     else
         player.velX *= airFriction;
 
-    //player.x += player.velX;
+    player.prevVelY = player.velY;          // Assign previous frame's y-velocity
 }
 
 function Generate(object, origin) {
@@ -1566,7 +1572,6 @@ function DrawCharSelect(logoMult) {
         default:
             break;
     }
-    //UICtx.drawImage(titleImg, width / 2 - (titleImg.width * screenScale) / 2, 100, titleImg.width * screenScale, titleImg.height * screenScale);
 }
 
 function DrawGame() {
@@ -1598,28 +1603,6 @@ function ChangeState(state) {
     else
         isAnimating = false;
 
-    //switch (state) {
-    //    case 0:
-    //        isAnimating = false;
-    //        break;
-    //    case 1:
-    //        isAnimating = true;
-    //        break;
-    //    case 2:
-    //        isAnimating = false;
-    //        break;
-    //    case 3:
-    //        isAnimating = false;
-    //        break;
-    //    case 4:
-    //        isAnimating = false;
-    //        break;
-    //    case 5:
-    //        isAnimating = false;
-    //        break;
-    //    default:
-    //        break;
-    //}
     selected = 0;
     counter = 0;
     menuOptions.length = numOptions[state];
@@ -1632,7 +1615,6 @@ function DrawSplash(logoMult) {
     UICtx.clearRect(0, 0, width, height);
     DrawBackground();
     foregroundCtx.clearRect(0, 0, width, height);
-    //DrawText("TEST", 150, [width / 2, 100], "white", "black", 35, "center", "top");
     UICtx.drawImage(titleImg, width / 2 - (titleImg.width * screenScale) / 2, 100, titleImg.width * screenScale, titleImg.height * screenScale);
     DrawMenuText("PLAY", 150, 65, splashPos, 0, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 0, logoMult);
     DrawMenuText("INSTRUCTIONS", 150, 65, splashPos, 100, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 1, logoMult);
@@ -1700,9 +1682,6 @@ function DrawBackground() {
 function DrawCanvas() {
     foregroundCtx.clearRect(0, 0, width, height);
 
-
-    //console.log(powerups.length);
-
     // Animate sprites
     if (isAnimating) {
         AnimationFrame(player);
@@ -1725,7 +1704,6 @@ function DrawCanvas() {
 
     for (var i = 0; i < powerups.length; i++) {
         foregroundCtx.drawImage(powerups[i].img, powerups[i].x, powerups[i].y, powerups[i].width * screenScale, powerups[i].height * screenScale);
-        //console.log(powerups[i].drawHeight);
     }
 
 
@@ -1777,7 +1755,6 @@ function DrawUI() {
             if (particles[i].alpha < 0) {
                 particles.splice(i, 1);
                 i--;
-                //console.log("Deleted particle");
             }
             if (particles.length > 0) {
                 UICtx.fillStyle = "rgba(" + particles[i].r + "," + particles[i].g + "," + particles[i].b + "," + particles[i].alpha + ")";
@@ -1788,7 +1765,6 @@ function DrawUI() {
 }
 
 function DrawText(text, size, pos, fillCol, strokeCol, strokeWidth, align, baseline) {
-    //UICtx.clearRect(0, 0, width, height);
     UICtx.font = '' + (size * screenScale) + 'px "Joystix"';
     UICtx.textAlign = align;
     UICtx.strokeStyle = strokeCol;
