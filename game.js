@@ -1,5 +1,5 @@
-// Debug
-var debugActive = true;                 // Debug boolean
+// Storage
+var gameStorage = window.localStorage;  // Declare a local storage variable
 
 // Framerate
 var fps = 60;                           // Target FPS
@@ -56,12 +56,18 @@ var powerup1sfx = new Audio("assets/sfx/p1.mp3");               // Powerup colle
 // Game states
 var GAMESTATES = ["Splash", "Game", "Pause", "GameOver", "Hiscore", "Instructions", "CharSelect"];  // Store the available gamestates
 var currentGameState = GAMESTATES[0];                                                               // Store and assign the currently selected gamestate
+var menuOptions = [];                                                                               // Array to store the current number of menu options
+var selected = 0;                                                                                   // Iterator to indicate current selected menu option
+var numOptions = [3, 0, 3, 2, 1, 1, 3];                                                             // Specify number of menu options available for each game state
 
 // Level and scoring
 var level = 1;              // Current level
 var levelUpScore = 200;     // Current score to level up
 var levelIncrement = 400;   // Value levelUpScore increments by level
 var score = 0;              // Current score
+var hiscore = 0;            // Current hiscore
+var defaultHiscore = 5000;  // Default hiscore if no hiscore saved to local storage
+var newHiscore = false;     // Determine whether to display new hiscore text on gameover
 var scoreIncrement = 100;   // Score awarded per enemy defeated
 var powerupBonus = 50;      // Score awarded on powerup collection
 
@@ -99,9 +105,6 @@ var counter = 0;                                        // Animation counter
 var pulseSpeed = 1.5;                                   // Text pulse speed
 var pulseExtent = 20;                                   // Set extent text pulses to
 var increase = Math.PI * pulseSpeed / 100;              // Rate counter increases at
-var menuOptions = [];                                   // Array to store the current number of menu options
-var selected = 0;                                       // Iterator to indicate current selected menu option
-var numOptions = [3, 0, 4, 2, 1, 1, 3];                 // Specify number of menu options available for each game state
 
 
 
@@ -240,9 +243,9 @@ class Particle {
         this.y = 0;                                                         // Y-position
         this.velX = Math.floor(Math.random() * 50) - 25;                    // Set random x-velocity
         this.velY = Math.floor(Math.random() * 50) - 25;                    // Set random y-velocity
-        this.r = 255;                                                       // Set colour value: red
-        this.g = Math.floor(Math.random() * 50) + 100;                      //                 : green
-        this.b = Math.floor(Math.random() * 50) + 100;                      //                 : blue
+        this.r = Math.floor(Math.random() * 255);                                                       // Set colour value: red
+        this.g = Math.floor(Math.random() * 255);                      //                 : green
+        this.b = Math.floor(Math.random() * 255);                      //                 : blue
         this.alpha = 1.0;                                                   //                 : alpha
         this.fillStyle = "rbga(" + this.r + "," + this.g + "," + this.b + "," + this.alpha+")";       // Combine colour values as fill style
     }
@@ -511,12 +514,20 @@ function SetEnemySprite(i) {
     enemies[i].spriteWidth = 152;       // Sprite source width
     enemies[i].spriteHeight = 144;      // Sprite source height
     enemies[i].isExploding = true;      // Set to exploding
+    p.generate(enemies[i].x + enemies[i].width / 2, enemies[i].y + enemies[i].height / 2, 50);    // Generate explosion particle effect on enemy position
 }
 
 
 function Initialise() {
     // Load music and SFX
     BGM.play();                                                             // Play background music on start
+
+    // Check for highscore
+    hiscore = gameStorage.getItem('hiscore');                               // Retrieve stored hiscore
+    if (hiscore == null) {
+        hiscore = defaultHiscore;
+        gameStorage.setItem('hiscore', hiscore);                            // Set new hiscore if no previous hiscore set
+    }
 
     // Load images from file
     titleImg.src = "title.png";                                             // Splash screen title image
@@ -583,12 +594,13 @@ function Initialise() {
     // Parallax: Highway
     for (var i = 0; i < 7; i++) {
         highwayScroll.push({
-            x: i * (384 * screenScale),
-            y: height - highwayImg.height * screenScale,
             height: 303,
             width: 384,
+            x: i * (384 * screenScale),
+            y: height - (303 / 3) * 2 * screenScale,
             image: highwayImg
         });
+        console.log("Highway pos: " + highwayScroll[i].x);
     }
 
     menuOptions.length = numOptions[0];     // Initialise menu options length to number of splash screen options
@@ -743,8 +755,11 @@ function CalculateCollisions() {
                     Generate("powerup", enemies[j]);                //      Generate powerup
                     score += powerupBonus;                          //      Add powerup bonus
                 }
-                if (enemies.length > 0)
-                    p.generate(enemies[j].x + enemies[j].width / 2, enemies[i].y + enemies[i].height/2, 50);    // Generate explosion particle effect on enemy position
+                //if (enemies.length > 0)
+                //    try {
+                //        p.generate(enemies[j].x + enemies[j].width / 2, enemies[i].y + enemies[i].height / 2, 50);    // Generate explosion particle effect on enemy position
+                //    }
+                //    catch (error) {}
                 if (score > levelUpScore) {                         
                     LevelUp();  // Level up when level up score reached
                 }
@@ -759,8 +774,14 @@ function CalculateCollisions() {
             if (dir != null) {
                 if (!player.isImmune) {
                     player.health--;                    // Reduce player health on collision
-                    if (player.health <= 0)
+                    if (player.health <= 0) {
+                        if (score > hiscore) {
+                            hiscore = score;
+                            newHiscore = true;
+                            gameStorage.setItem('hiscore', hiscore);
+                        }
                         ChangeState(3);                 // Game Over if player health reaches 0
+                    }
                     player.isImmune = true;             // Set player temporary immunity on hit
                     player.isHurt = true;               // Set player to hurt state
                     hitsfx.play();                      // Play hit SFX
@@ -790,6 +811,7 @@ function LevelUp() {
     levelUpsfx.play();                          // Play level up SFX
     if (player.health < player.healthMax)       //
         player.health++;                        // Restore player health if below max health
+    enemySpawnTimerMax -= level* 5 ;            // Speed up enemy spawn on level progression
 }
 
 // Apply gravity to all objects stored in objects array
@@ -912,37 +934,37 @@ function PlayerControl() {
             }
         }
 
-        if (player.isHurt) {
-            player.velX = 0;
-            player.velY = 0;
-            player.facing = "right";
-            if (player.sprite != "hurt")
-                SetPlayerSprite(player.characterIndex,"hurt");
+        if (player.isHurt) {                                        
+            player.velX = 0;                                        // Stop player while hurt
+            player.velY = 0;                                        //
+            player.facing = "right";                                // Set player to face right
+            if (player.sprite != "hurt")                            //  
+                SetPlayerSprite(player.characterIndex,"hurt");      // Set player sprite to hurt if not already set
         }
     }
 
     // Update player's x-position
-    if (player.isGrounded)
-        player.velX *= groundFriction;
+    if (player.isGrounded)                  
+        player.velX *= groundFriction;      // Slow player while grounded at groundFriction rate
     else
-        player.velX *= airFriction;
+        player.velX *= airFriction;         // Slow player while airborne at airFriction rate
 
     player.prevVelY = player.velY;          // Assign previous frame's y-velocity
 }
 
+// Generate specified object at point
 function Generate(object, origin) {
-    switch (object) {
-        case "bullet":
-            playerBullets.push(bullet);
-            var bulletData = {
+    switch (object) {   // Determine object to generate
+        case "bullet":  // BULLET
+            playerBullets.push(bullet);                                                         // Add default bullet values to playerBullets array
+            var bulletData = {                                                                  // Centre bullet position on player
                 x: player.x + player.width - (65 * screenScale),
                 y: player.y + (player.height / 3) * screenScale - (7 * screenScale),
 
             }
-            playerBullets[playerBullets.length - 1] = Object.assign({}, bullet, bulletData);
-            if (player.powerup1Active) {
-                //TODO powerup code
-                playerBullets.push(bullet);
+            playerBullets[playerBullets.length - 1] = Object.assign({}, bullet, bulletData);    // Modify bullet with updated position
+            if (player.powerup1Active) {                                                        // POWERUP 1
+                playerBullets.push(bullet);                                                     // Fire extra bullet at 45o up 
                 var bulletData = {
                     x: player.x + player.width - (65 * screenScale),
                     y: player.y + (player.height / 3) * screenScale - (7 * screenScale),
@@ -950,7 +972,7 @@ function Generate(object, origin) {
                     velY: -5
                 }
                 playerBullets[playerBullets.length - 1] = Object.assign({}, bullet, bulletData);
-                playerBullets.push(bullet);
+                playerBullets.push(bullet);                                                     // Fire extra bullet at 45o down
                 var bulletData = {
                     x: player.x + player.width - (65 * screenScale),
                     y: player.y + (player.height / 3) * screenScale - (7 * screenScale),
@@ -959,31 +981,30 @@ function Generate(object, origin) {
                 }
                 playerBullets[playerBullets.length - 1] = Object.assign({}, bullet, bulletData);
             }
-            player.shootTimer = 0;
+            player.shootTimer = 0;                                                              // Reset bullet timer
             break;
-        case "enemy":
-            var tempEnemy;
-            var enemyData = {
-                x: width,
-                y: groundHeight + 50 * screenScale - ((Math.random() * 300) * screenScale),
-                speed: Math.floor(Math.random() * 5) + scrollSpeed + level,
-                sprite: enemyImg
+        case "enemy":   // TODO: Add more enemy types
+            var tempEnemy;                                                                      // Enemy object to be assigned to array
+            var enemyData = {                                                                   //
+                x: width,                                                                       // Set spawn x-position 
+                y: groundHeight + 50 * screenScale - ((Math.random() * 300) * screenScale),     // Randomise spawn y-position
+                speed: Math.floor(Math.random() * 5) + scrollSpeed + level,                     // Randomise movement speed, increase by level
+                sprite: enemyImg                                                                // Set spritesheet
             }
-            tempEnemy = Object.assign({}, enemy, enemyData);
-            enemies.push(tempEnemy);
+            tempEnemy = Object.assign({}, enemy, enemyData);                                    // Combine default enemy and enemyData values
+            enemies.push(tempEnemy);                                                            // Push enemy to enemies array
             break;
-        case "powerup":
-            var pUp = new Sprite();
-            pUp.x = origin.x + origin.width / 2;
-            pUp.y = origin.y + origin.height / 2;
-            pUp.spriteWidth = 48;
-            pUp.spriteHeight = 60;
-            pUp.width = 48 * screenScale;
-            pUp.height = 60 * screenScale;
+        case "powerup": // POWERUP
+            var pUp = new Sprite();                         // Declare new Sprite object
+            pUp.x = origin.x + origin.width / 2;            // Centre powerup on specified origin
+            pUp.y = origin.y + origin.height / 2;           //
+            pUp.spriteWidth = 48;                           // Set powerup sprite source width
+            pUp.spriteHeight = 60;                          // Set powerup sprite source height
+            pUp.width = 48 * screenScale;                   // Set powerup draw width
+            pUp.height = 60 * screenScale;                  // Set powerup draw height
 
-
-            var rnd = Math.floor(Math.random() * 100);
-            if (rnd < 50) {
+            var rnd = Math.floor(Math.random() * 100);      
+            if (rnd < 50) {                                 // Determine powerup to spawn: 50/50
                 pUp.img = p1Img;
             pUp.tag = 0;
             }
@@ -991,31 +1012,31 @@ function Generate(object, origin) {
                 pUp.img = p2Img;
                 pUp.tag = 1;
             }
-            powerups.push(pUp);
-            objects.push(pUp);
+            powerups.push(pUp);                             // Add powerup to powerups array
+            objects.push(pUp);                              // Add powerup to objects array
             break;
         default:
             break;
     }
 }
 
+// Game functionality
 function GameInput() {
-    //console.log(player.x + " " + player.isGrounded);
-    if (KeyDown(27)) {
+    if (KeyDown(27)) {                                      // ESCAPE:
         menuMove.currentTime = 0;
         menuMove.play();
-        ChangeState(2);
+        ChangeState(2);                                     // Change to Pause screen
     }
-    if (KeyDown(32)) {
-        if (!player.isHurt) {
+    if (KeyDown(32)) {                                      // SPACE (first press):
+        if (!player.isHurt) {                               // Generate and fire bullet if player is not hurt
             lasersfx.currentTime = 0;
             lasersfx.play();
             Generate("bullet");
             player.facing = "right";
         }
     }
-    if (keys[32] && player.facing != "left") {
-        if (player.shootTimer > player.shootTimerMax) {
+    if (keys[32] && player.facing != "left") {              // SPACE (held):
+        if (player.shootTimer > player.shootTimerMax) {     // Generate and fire bullet max shoot timer is reached and player is not hurt
             if (!player.isHurt) {
                 lasersfx.currentTime = 0;
                 lasersfx.play();
@@ -1025,45 +1046,46 @@ function GameInput() {
     }
 }
 
+// Reset game level to initial values
 function ResetLevel() {
+    // Player
     player.x = Object.assign(playerInit.x);
     player.y = (height - 282 * screenScale);
     player.isImmune = false;
     player.health = Object.assign(playerInit.healthMax);
+    player.isHurt = false;
+    player.hurtTimer = 0;
+    // Level values
     score = 0;
-    enemies.length = 0;
-    playerBullets.length = 0;
     level = 1;
     levelUpScore = 200;
     enemySpawnTimerMax = 50;
-    player.isHurt = false;
-    player.hurtTimer = 0;
+    // Arrays
+    enemies.length = 0;
+    playerBullets.length = 0;
     powerups.length = 0;
     particles.length = 0;
+    newHiscore = false;
 }
 
+// Pause menu functionality
 function PauseInput() {
-    if (KeyDown(27))                        // Esc
-        ChangeState(2);
-    if (KeyDown(13)) {                 // Enter
-        menuSelect.currentTime = 0;
+    if (KeyDown(27))                // ESCAPE:
+        ChangeState(1);             // ---Return to gameplay
+    if (KeyDown(13)) {              // ENTER:
+        menuSelect.currentTime = 0; // ---Play menu select SFX
         menuSelect.play();
         switch (selected) {
-            case 0:                             // RESUME
-                ChangeState(1);
+            case 0:                 // RESUME
+                ChangeState(1);     // ---Return to gameplay
                 break;
-            case 1:                             // RETRY
-                // TODO: Reset level
-                ResetLevel();
-                ChangeState(1);
+            case 1:                 // RETRY
+                ResetLevel();       // ---Reset level
+                ChangeState(1);     // ---Return to gameplay
                 break;
-            case 2:                             // OPTIONS
-                // TODO: Options
-                break;
-            case 3:                             // RETURN TO MENU
-                // TODO: Return to menu
-                ResetLevel();
-                ChangeState(0);
+            case 2:                 // EXIT
+                ResetLevel();       // ---Reset level
+                ChangeState(0);     // ---Return to main menu
                 break;
             default:
                 break;
@@ -1071,13 +1093,15 @@ function PauseInput() {
     }
 }
 
+
+// Determine input functionality by state
 function ProcessInput() {
     switch (currentGameState) {
         case GAMESTATES[0]:                 // Splash screen
             SplashInput();
             MenuNavigation();
             break;
-        case GAMESTATES[1]:                 // Game screen
+        case GAMESTATES[1]:                 // Gameplay screen
             GameInput();
             PlayerControl();
             break;
@@ -1088,44 +1112,33 @@ function ProcessInput() {
         case GAMESTATES[3]:                 // Game over screen
             GameOverInput();
             MenuNavigation();
-            // TODO: GameOver input
             break;
-        case GAMESTATES[4]:
-            // TODO: Hiscore input
+        case GAMESTATES[4]:                 // Hiscore screen
+            HiscoreInput();
+            MenuNavigation();
             break;
-        case GAMESTATES[5]:
+        case GAMESTATES[5]:                 // Instruction screen
             InstructionInput();
             MenuNavigation();
             break;
-        case GAMESTATES[6]:
+        case GAMESTATES[6]:                 // Character select screen
             CharSelectInput();
             MenuNavigation();
         default:
             break;
     }
-
-    if (KeyDown(46))
-        debugActive = !debugActive;
-
-    if (debugActive)
-        StateControl();
 }
 
-function GameOverInput() {
-    if (KeyDown(27))                        // Esc
-        ChangeState(0);
-    if (KeyDown(13)) {                     // Enter
+// Hiscore screen input functionality
+function HiscoreInput() {
+    if (KeyDown(27))                    // ESCAPE:
+        ChangeState(0);                 // ---Return to main menu
+    if (KeyDown(13)) {                  // ENTER:
         menuSelect.currentTime = 0;
         menuSelect.play();
         switch (selected) {
-            case 0:                             // RETRY
-                ResetLevel();
-                ChangeState(1);
-                break;
-            case 1:                             // EXIT
-                // TODO: Reset level
-                ResetLevel();
-                ChangeState(0);
+            case 0:                     // RETURN
+                ChangeState(0);         // ---Return to gameplay
                 break;
             default:
                 break;
@@ -1133,57 +1146,82 @@ function GameOverInput() {
     }
 }
 
+// Gameover screen input functionality
+function GameOverInput() {
+    if (KeyDown(27))                    // ESCAPE:
+        ChangeState(0);                 // ---Return to main menu
+    if (KeyDown(13)) {                  // ENTER:
+        menuSelect.currentTime = 0;     
+        menuSelect.play();
+        switch (selected) {
+            case 0:                     // RETRY
+                ResetLevel();           // ---Reset level
+                ChangeState(1);         // ---Return to gameplay
+                break;
+            case 1:                     // EXIT
+                ResetLevel();           // ---Reset level
+                ChangeState(0);         // ---Return to main menu
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+// Generic menu navigation functionality based on menuOptions length
 function MenuNavigation() {
     if (currentGameState == GAMESTATES[6]) {
-        if (KeyDown(39)) {  // Right arrow
+        // Character Select screen: uses LEFT and RIGHT arrow keys to navigate options
+        if (KeyDown(39)) {                              // RIGHT arrow
             menuMove.currentTime = 0;
             menuMove.play();
 
-            if (selected + 1 >= menuOptions.length) {
+            if (selected + 1 >= menuOptions.length) {   // Return to first menu option when end of array reached
                 selected = 0;
                 counter = 0;
             }
-            else {
+            else {                                      // Else select next menu option
                 selected++;
                 counter = 0;
             }
         }
-        if (KeyDown(37)) {  // Left arrow
+        if (KeyDown(37)) {                              // LEFT arrow
             menuMove.currentTime = 0;
             menuMove.play();
-            if (selected - 1 < 0) {
+            if (selected - 1 < 0) {                     // Return to last menu option when end of array reached
                 selected = menuOptions.length - 1;
                 counter = 0;
             }
-            else {
+            else {                                      // Else select previous menu option
                 selected--;
                 counter = 0;
             }
         }
     }
     else {
-        if (KeyDown(40)) {  // Down arrow
+        // All other menu screens: use UP and DOWN arrow keys to navigate options
+        if (KeyDown(40)) {                              // DOWN arrow
             menuMove.currentTime = 0;
             menuMove.play();
 
-            if (selected + 1 >= menuOptions.length) {
+            if (selected + 1 >= menuOptions.length) {   // ---Return to first menu option when end of array reached
                 selected = 0;
                 counter = 0;
             }
-            else {
+            else {                                      // ---Else select next menu option
                 selected++;
                 counter = 0;
             }
         }
 
-        if (KeyDown(38)) {  // Up arrow
+        if (KeyDown(38)) {                              // UP arrow
             menuMove.currentTime = 0;
             menuMove.play();
-            if (selected - 1 < 0) {
+            if (selected - 1 < 0) {                     // ---Return to last menu option when end of array reached
                 selected = menuOptions.length - 1;
                 counter = 0;
             }
-            else {
+            else {                                      // ---Else select previous menu option
                 selected--;
                 counter = 0;
             }
@@ -1191,77 +1229,60 @@ function MenuNavigation() {
     }
 }
 
-function StateControl() {
-    if (KeyDown(49)) {                                 // Splash
-        selected = 0;
-        menuOptions.length = 3;
-        currentGameState = GAMESTATES[0];
-    }
-    if (KeyDown(50)) {                                 // Game
-        selected = 0;
-        currentGameState = GAMESTATES[1];
-    }
-    if (KeyDown(51)) {                                 // Pause
-        selected = 0;
-        currentGameState = GAMESTATES[2];
-    }
-    if (KeyDown(52)) {                                // Game over
-        selected = 0;
-        currentGameState = GAMESTATES[3];
-    }
-}
-
+// Instruction screen input functionality
 function InstructionInput() {
-    if (KeyDown(13) || KeyDown(27)) {
+    if (KeyDown(13) || KeyDown(27)) {   // ENTER or ESCAPE
         menuSelect.currentTime = 0;
         menuSelect.play();
-        ChangeState(0);
+        ChangeState(0);                 // ---Return to main menu
     }
 }
 
+// Character select screen input functionality
 function CharSelectInput() {
-    if (KeyDown(13)) {
+    if (KeyDown(13)) {                  // ENTER
         menuSelect.currentTime = 0;
         menuSelect.play();
         switch (selected) {
-            case 0:             // Character Select
-                SetPlayerCharacter(0);
-                ChangeState(1);
+            case 0:                     // Select CHARACTER 1:
+                SetPlayerCharacter(0);  // ---Set player character as VELA
+                ChangeState(1);         // ---Go to gameplay
                 break;
-            case 1:             // Instructions
-                SetPlayerCharacter(1);
-                ChangeState(1);
+            case 1:                     // Select CHARACTER 2:
+                SetPlayerCharacter(1);  // ---Set player character as QUINN
+                ChangeState(1);         // ---Go to gameplay
                 break;
-            case 2:             // Hiscores
-                SetPlayerCharacter(2);
-                ChangeState(1);
+            case 2:                     // Select CHARACTER 3:
+                SetPlayerCharacter(2);  // ---Set player character as PYXEL
+                ChangeState(1);         // ---Go to gameplay
                 break;
             default:
                 break;
         }
     }
-    if (KeyDown(27)) {
+    if (KeyDown(27)) {                  // ESCAPE
         menuSelect.currentTime = 0;
         menuSelect.play();
-        ChangeState(0);
+        ChangeState(0);                 // ---Return to main menu
     }
 }
 
+// Splash screen input functionality
 function SplashInput() {
     // MENU SELECTION
-    if (KeyDown(13)) {
+    if (KeyDown(13)) {                  // ENTER
         menuSelect.currentTime = 0;
         menuSelect.play();
         switch (selected) {
-            case 0:             // Character Select
-                //BGM.play();
-                ChangeState(6);
+            case 0:                     // Play:
+                BGM.play();             // ---Play background music
+                ChangeState(6);         // ---Go to character select
                 break;
-            case 1:             // Instructions
-                ChangeState(5);
+            case 1:                     // Instructions:
+                ChangeState(5);         // ---Go to instruction screen
                 break;
-            case 2:             // Hiscores
-                //ChangeState(4);
+            case 2:                     // Hiscores:
+                ChangeState(4);         // ---Go to hiscore screen
                 break;
             default:
                 break;
@@ -1269,121 +1290,111 @@ function SplashInput() {
     }
 }
 
-function DrawInstructions(logoMult) {
-    backgroundCtx.clearRect(0, 0, width, height);
-    foregroundCtx.clearRect(0, 0, width, height);
-    UICtx.clearRect(0, 0, width, height);
-    DrawBackground();
-    backgroundCtx.fillStyle = 'rgba(0,0,0,0.3)';
-    backgroundCtx.fillRect(0, 0, width, height);
-    var titlePos = [width / 2, 75 * screenScale];
-    DrawText("INSTRUCTIONS", 100, titlePos, "white", "black", 35, "center", "top");
-    var instructPos = [width / 2, 300 * screenScale];
-    var textOffset = 65;
-    DrawText("Move left/right: A / D", 35, instructPos, "white", "black", 15, "center", "top");
-    DrawText("Jump: SPACE", 35, [instructPos[0], instructPos[1] + textOffset], "white", "black", 15, "center", "top");
-    DrawText("Shoot: RETURN", 35, [instructPos[0], instructPos[1] + textOffset * 2], "white", "black", 15, "center", "top");
-    DrawText("Pause: ESC", 35, [instructPos[0], instructPos[1] + textOffset * 3], "white", "black", 15, "center", "top");
-    DrawMenuText("RETURN", 150, 65, [width / 2, height - 200 * screenScale], 75, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 0, logoMult);
-}
-
+// Update all bullets
 function UpdateBullets() {
+    // Player bullets
     for (var i = 0; i < playerBullets.length; i++) {
         playerBullets[i].x += playerBullets[i].speed;
         playerBullets[i].y += playerBullets[i].velY;
-        //console.log(playerBullets[i].velY)
         if (playerBullets[i].x > width)
-            playerBullets.splice(i, 1);
+            playerBullets.splice(i, 1);                 // Delete bullet if off-screen
 
     }
-    if (keys[32] && player.facing != "left")
-        player.shootTimer++;
+    if (keys[32] && player.facing != "left")            // SPACE:
+        player.shootTimer++;                            // ---Increment shot timer when fire held and not facing left
 }
 
+// Update all enemies
 function UpdateEnemies() {
     for (var i = 0; i < enemies.length; i++) {
         if (!enemies[i].isExploding)
-            enemies[i].x -= enemies[i].speed;
+            enemies[i].x -= enemies[i].speed;                               // Move enemy if not exploding
         else
-            enemies[i].x -= scrollSpeed;
+            enemies[i].x -= scrollSpeed;                                    // Else move at scroll speed
         if (enemies[i].x < (enemies[i].spriteWidth * screenScale) * -1)
-            enemies.splice(i, 1);
+            enemies.splice(i, 1);                                           // Delete enemy if off-screen
         if (enemies[i].isExploding)
             if (enemies[i].frame >= enemies[i].frameMax)
-                enemies[i].active = false;
+                enemies[i].active = false;                                  // Mark enemy for deletion when explosion animation finished
     }
 }
 
+// Update all objects
 function UpdateObjects() {
+    // Update game objects
     ApplyGravity();
     UpdateBullets();
     UpdateEnemies();
+
+    // Enemy spawn
     enemySpawnTimer++;
     if (enemySpawnTimer > enemySpawnTimerMax) {
-        var rnd = Math.random() * 100;
-        if (rnd < (5 + level * 2)) {                          
-            Generate("enemy");                  // Spawn enemy at rate of 5% every frame after max timer reached (increasing with level progression)
-            enemySpawnTimer = 0;
-            enemySpawnTimerMax--;        // Speed up enemy spawn on level progression
+        var rnd = Math.random() * 100;          
+        if (rnd < (5 + level * 2)) {            // 5% (+ double level value) chance to spawn enemy every frame after max spawn timer reached
+            Generate("enemy");                  // Generate enemy
+            enemySpawnTimer = 0;                // Reset spawn timer
         }
 
     }
+
+    // Player
     if (player.isImmune) {
         player.immuneTimer++;
-        if (player.immuneTimer > player.immuneTimerMax) {
+        if (player.immuneTimer > player.immuneTimerMax) {       // Stop player immunity when max timer reached
             player.isImmune = false;
             player.immuneTimer = 0;
         }
     }
-
     if (player.isHurt) {
         player.hurtTimer++;
-        if (player.hurtTimer > player.hurtTimerMax) {
+        if (player.hurtTimer > player.hurtTimerMax) {           // Remove player hurt state when max timer reached
             player.isHurt = false;
             player.hurtTimer = 0;
         }
     }
 
+    // Powerups
     if (player.powerup1Active) {
         player.powerup1Timer++;
-        if (player.powerup1Timer > player.powerup1TimerMax) {
+        if (player.powerup1Timer > player.powerup1TimerMax) {   // Deactivate powerup1 when max timer reached
             player.powerup1Active = false;
             player.powerup1Timer = 0;
         }
     }
     if (player.powerup2Active) {
         player.powerup2Timer++;
-        if (player.powerup2Timer > player.powerup2TimerMax) {
+        if (player.powerup2Timer > player.powerup2TimerMax) {   // Deactivate powerup2 when max timer reached
             player.powerup2Active = false;
             player.powerup2Timer = 0;
             player.shootTimerMax = 20;
         }
     }
 
-    player.x += player.velX;
+    player.x += player.velX;                                    // Move player by velocity
 }
 
+// Update Gameplay
 function UpdateGame() {
     UpdateObjects();
-    CalculateCollisions();
-    ScrollBackground(scrollSpeed);
-    DrawGame();
-    //console.log(player.powerup1Active);
+    CalculateCollisions();              
+    ScrollBackground(scrollSpeed);  
+    DrawGame();                     
 }
 
+// Scroll parallax background
 function ScrollBackground(scrollSpeed) {
-    // Back plane
+    // Background Scroll
     for (var i = 0; i < backgroundScroll.length; i++) {
-        backgroundScroll[i].x -= (scrollSpeed * 0.3);
-        if (backgroundScroll[i].x <= (backgroundImg.width * screenScale * -1) - (500 * screenScale)) {
-            backgroundScroll.splice(0, 1);
+        backgroundScroll[i].x -= (scrollSpeed * 0.3);                                                           // Move background tile
+        if (backgroundScroll[i].x <= (backgroundImg.width * screenScale * -1) - (500 * screenScale)) {          // 
+            backgroundScroll.splice(0, 1);                                                                      // Delete background tile when off screen
             if (backgroundIndex > 5) {
-                backgroundScroll.push({
+                backgroundScroll.push({                                                                         // Add background tile to array when previous tile deleted
                     x: backgroundScroll[backgroundScroll.length - 1].x + backgroundImg.width * screenScale,
                     y: 0,
                     image: backgroundImg2
                 });
-                backgroundIndex -= backgroundIndex;
+                backgroundIndex -= backgroundIndex;                                                             // Reduce index
             }
             else {
                 backgroundScroll.push({
@@ -1395,24 +1406,26 @@ function ScrollBackground(scrollSpeed) {
             backgroundIndex++;
         }
     }
-    // Scroll middle plane
+
+    // Midground scroll
     for (var i = 0; i < midgroundScroll.length; i++) {
-        midgroundScroll[i].x -= (scrollSpeed * 0.5);
+        midgroundScroll[i].x -= (scrollSpeed * 0.5);                                                        // Scroll midground tile
         if (midgroundScroll[i].x <= (midgroundImg.width * screenScale * -1) - (500 * screenScale)) {
-            midgroundScroll.splice(0, 1);
-            midgroundScroll.push({
+            midgroundScroll.splice(0, 1);                                                                   // Remove tile when off-screen
+            midgroundScroll.push({                                                                          // Add new tile when tile removed
                 x: midgroundScroll[midgroundScroll.length - 1].x + midgroundImg.width * screenScale,
                 y: 0,
                 image: midgroundImg
             });
         }
     }
-    // Scroll near plane
+
+    // Foreground Scroll
     for (var i = 0; i < foregroundScroll.length; i++) {
-        foregroundScroll[i].x -= scrollSpeed * 0.75;
+        foregroundScroll[i].x -= scrollSpeed * 0.75;                                                        // Scroll foreground tile
         if (foregroundScroll[i].x <= (foregroundImg.width * screenScale * -1) - (1000 * screenScale)) {
-            foregroundScroll.splice(0, 1);
-            foregroundScroll.push({
+            foregroundScroll.splice(0, 1);                                                                  // Remove tile when off-screen
+            foregroundScroll.push({                                                                         // Add new tile when tile removed
                 x: foregroundScroll[foregroundScroll.length - 1].x + foregroundImg.width * screenScale,
                 y: 0,
                 image: foregroundImg
@@ -1420,28 +1433,29 @@ function ScrollBackground(scrollSpeed) {
         }
     }
 
-    // Scroll near plane
+    // Tree Scroll
     for (var i = 0; i < treesScroll.length; i++) {
-        treesScroll[i].x -= scrollSpeed * 0.85;
+        treesScroll[i].x -= scrollSpeed * 0.85;                                                             // Scroll tree tile
         if (treesScroll[i].x <= 0 - (treesScroll[i].width * 2 * screenScale)) {
-            treesScroll.push({
+            treesScroll.splice(0, 1);                                                                       // Remove tile when off-screen
+            treesScroll.push({                                                                              // Add new tile when tile removed
                 x: treesScroll[treesScroll.length - 1].x + treesScroll[i].width * screenScale,
                 y: 0,
                 height: 1080,
                 width: 288,
                 image: treeImg
             });
-            treesScroll.splice(0, 1);
         }
     }
 
+    // Highway Scroll
     for (var i = 0; i < highwayScroll.length; i++) {
-        highwayScroll[i].x -= scrollSpeed;
-        if (highwayScroll[i].x <= 0 - (highwayScroll[i].width * 2 * screenScale)) {
-            highwayScroll.splice(0, 1);
-            highwayScroll.push({
+        highwayScroll[i].x -= scrollSpeed;                                                                  // Scroll highway tile
+        if (highwayScroll[i].x <= 0-(highwayScroll[i].width * 2 * screenScale)) {
+            highwayScroll.splice(0, 1);                                                                     // Remove tile when off-screen
+            highwayScroll.push({                                                                            // Add new tile when tile removed
                 x: highwayScroll[highwayScroll.length - 1].x + highwayScroll[i].width * screenScale,
-                y: height - highwayImg.height * screenScale,
+                y: height - (highwayImg.height /3) * 2 * screenScale,
                 height: 303,
                 width: 384,
                 image: highwayImg
@@ -1450,65 +1464,95 @@ function ScrollBackground(scrollSpeed) {
     }
 }
 
+// Update function
 function Update() {
-    requestAnimationFrame(Update);  // Request update before next repaint
+    requestAnimationFrame(Update);                              // Request update before next repaint
 
-
-    now = Date.now();
-    delta = now - then;
-    ProcessInput();
+    now = Date.now();                                           // Set current frame time
+    delta = now - then;                                         // Calculate delta time from last frame
+    ProcessInput();                                             // Process game input depending on game state (menu navigation and selection)
 
     if (delta > interval) {
-        then = now - (delta % interval);
+        then = now - (delta % interval);                        // Set previous frame time when interval time passed
 
-        var logoMult = Math.sin(counter) / pulseExtent + 0.5;
-        counter += increase;
-        // Determine state to update
+        var logoMult = Math.sin(counter) / pulseExtent + 0.5;   // Calculate menu option pulse size multiplier as sin function
+        counter += increase;                                    // Increment sin function counter by specified rate of increase
+
+        // Determine game state to update
         switch (currentGameState) {
             case GAMESTATES[0]:                 // Splash
-                ScrollBackground(scrollSpeed);
-                DrawSplash(logoMult);
+                ScrollBackground(scrollSpeed);  // ---Scroll parallax background
+                DrawSplash(logoMult);           // ---Draw splash screen
                 break;
             case GAMESTATES[1]:                 // Game
-                UpdateGame();
+                UpdateGame();                   // ---Update game (objects and draw)
                 break;
             case GAMESTATES[2]:                 // Pause
-                DrawPause(logoMult);
+                DrawPause(logoMult);            // ---Draw pause screen
                 break;
             case GAMESTATES[3]:                 // Game over
-                DrawGameOver(logoMult);
+                DrawGameOver(logoMult);         // ---Draw game over screen
                 break;
             case GAMESTATES[4]:                 // Hiscores
-                ScrollBackground(scrollSpeed);
-                DrawHiscores(logoMult);
+                ScrollBackground(scrollSpeed);  // ---Scroll parallax background
+                DrawHiscore(logoMult);         // ---Draw highscore screen
                 break;
             case GAMESTATES[5]:                 // Instructions
-                ScrollBackground(scrollSpeed);
-                DrawInstructions(logoMult);
+                ScrollBackground(scrollSpeed);  // ---Scroll parallax background
+                DrawInstructions(logoMult);     // ---Draw instruction screen
                 break;
             case GAMESTATES[6]:                 // Character select
-                ScrollBackground(scrollSpeed);
-                DrawCharSelect(logoMult);
+                ScrollBackground(scrollSpeed);  // ---Scroll parallax background
+                DrawCharSelect();               // ---Draw character select screen
             default:
                 break;
         }
     }
-    previousKeys = keys.slice(0);   // Store current keystate to compare next frame
+    previousKeys = keys.slice(0);               // Store current keystate to compare next frame
 }
 
-function DrawCharSelect(logoMult) {
-    UICtx.clearRect(0, 0, width, height);
-    UICtx.clearRect(0, 0, width, height);
-    DrawBackground();
+// Draw instruction screen
+function DrawInstructions(logoMult) {
+    // Clear layers
+    backgroundCtx.clearRect(0, 0, width, height);
     foregroundCtx.clearRect(0, 0, width, height);
-    DrawText("SELECT A CHARACTER", 75, [width / 2, 100], "white", "black", 35, "center", "top");
+    UICtx.clearRect(0, 0, width, height);
+    // Background
+    DrawBackground();
+    backgroundCtx.fillStyle = 'rgba(0,0,0,0.3)';
+    backgroundCtx.fillRect(0, 0, width, height);    // Apply screen darkening filter over background
+    // UI: title
+    var titlePos = [width / 2, 75 * screenScale];
+    DrawText("INSTRUCTIONS", 100, titlePos, "white", "black", 35, "center", "top");
+    // UI: instrctions
+    var instructPos = [width / 2, 300 * screenScale];
+    var textOffset = 65;
+    DrawText("Move left/right: [A] / [D]", 35, instructPos, "white", "black", 15, "center", "top");
+    DrawText("Jump: [W]", 35, [instructPos[0], instructPos[1] + textOffset], "white", "black", 15, "center", "top");
+    DrawText("Shoot: [SPACE]", 35, [instructPos[0], instructPos[1] + textOffset * 2], "white", "black", 15, "center", "top");
+    DrawText("Pause: [ESC]", 35, [instructPos[0], instructPos[1] + textOffset * 3], "white", "black", 15, "center", "top");
+    // UI: menu options
+    DrawMenuText("RETURN", 150, 65, [width / 2, height - 200 * screenScale], 75, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 0, logoMult);
+}
 
-    var portSize = 200 * screenScale;
-    var deselectSize = 225 * screenScale;
-    var selectSize = 325 * screenScale;
+// Draw character select screen
+function DrawCharSelect() {
+    // Clear layers
+    UICtx.clearRect(0, 0, width, height);
+    UICtx.clearRect(0, 0, width, height);
+    foregroundCtx.clearRect(0, 0, width, height);
+    // Background
+    DrawBackground();
+    // UI: title
+    DrawText("SELECT A CHARACTER", 75, [width / 2, 100], "white", "black", 35, "center", "top");
+    // UI: character select portraits
+    var portSize = 200 * screenScale;       // Portrait size
+    var deselectSize = 225 * screenScale;   // Portrait outline size when selected
+    var selectSize = 325 * screenScale;     // Portrait outline size when not selected
 
     switch (selected) {
-        case 0:
+        case 0: // Character 1 selected
+            // Draw Character 1
             UICtx.strokeStyle = 'rgba(255,255,255,1.0)';
             UICtx.lineWidth = 10 * screenScale;
             UICtx.strokeRect((width / 3) - selectSize / 2, height / 2 - selectSize / 2, selectSize, selectSize);
@@ -1516,53 +1560,55 @@ function DrawCharSelect(logoMult) {
             UICtx.drawImage(charPort0, (width / 3) - ((portSize * 1.5) / 2), height / 2 - ((portSize * 1.5) / 2), (portSize * 1.5), (portSize * 1.5));
             DrawText("VELA", 50, [width / 3, height / 2 + selectSize / 2 + 25 * screenScale], "white", "black", 10, "center", "top");
             UICtx.globalAlpha = 1.0;
-
+            // Draw Character 2
             UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
             UICtx.strokeRect((width / 2) - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
             UICtx.globalAlpha = 0.5;
             UICtx.drawImage(charPort1trans, (width / 2) - (portSize / 2), height / 2 - (portSize / 2), portSize, portSize);
             UICtx.globalAlpha = 1.0;
-
+            // Draw Character 3
             UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
             UICtx.strokeRect((width / 3) * 2 - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
             UICtx.globalAlpha = 0.5;
             UICtx.drawImage(charPort2trans, ((width / 3) * 2) - (portSize / 2), height / 2 - (portSize / 2), portSize, portSize);
             UICtx.globalAlpha = 1.0;
             break;
-        case 1:
+        case 1: // Character 2 selected
+            // Draw Character 1
             UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
             UICtx.lineWidth = 10 * screenScale;
             UICtx.strokeRect((width / 3) - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
             UICtx.globalAlpha = 0.5;
             UICtx.drawImage(charPort0trans, (width / 3) - (portSize / 2), height / 2 - ((portSize / 2)), portSize, portSize);
             UICtx.globalAlpha = 1.0;
-
+            // Draw Character 2
             UICtx.strokeStyle = 'rgba(255,255,255,1.0)';
             UICtx.strokeRect((width / 2) - selectSize / 2, height / 2 - selectSize / 2, selectSize, selectSize);
             UICtx.globalAlpha = 1.0;
             UICtx.drawImage(charPort1, (width / 2) - ((portSize * 1.5) / 2), height / 2 - (((portSize * 1.5) / 2)), (portSize * 1.5), (portSize * 1.5));
             DrawText("QUINN", 50, [width / 2, height / 2 + selectSize / 2 + 25 * screenScale], "white", "black", 10, "center", "top");
-
+            // Draw Character 3
             UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
             UICtx.strokeRect(((width / 3) * 2) - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
             UICtx.globalAlpha = 0.5;
             UICtx.drawImage(charPort2trans, ((width / 3) * 2) - (portSize / 2), height / 2 - (portSize / 2), portSize, portSize);
             UICtx.globalAlpha = 1.0;
             break;
-        case 2:
+        case 2: // Character 3 selected
+            // Draw Character 1
             UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
             UICtx.lineWidth = 10 * screenScale;
             UICtx.strokeRect((width / 3) - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
             UICtx.globalAlpha = 0.5;
             UICtx.drawImage(charPort0trans, (width / 3) - (portSize / 2), height / 2 - ((portSize / 2)), portSize, portSize);
             UICtx.globalAlpha = 1.0;
-
+            // Draw Character 2
             UICtx.strokeStyle = 'rgba(255,255,255,0.35)';
             UICtx.strokeRect((width / 2) - deselectSize / 2, height / 2 - deselectSize / 2, deselectSize, deselectSize);
             UICtx.globalAlpha = 0.5;
             UICtx.drawImage(charPort1, (width / 2) - ((portSize) / 2), height / 2 - (((portSize) / 2)), (portSize), (portSize));
             UICtx.globalAlpha = 1.0;
-
+            // Draw Character 3
             UICtx.strokeStyle = 'rgba(255,255,255,1.0)';
             UICtx.strokeRect(((width / 3) * 2) - selectSize / 2, height / 2 - selectSize / 2, selectSize, selectSize);
             UICtx.globalAlpha = 1.0;
@@ -1574,85 +1620,110 @@ function DrawCharSelect(logoMult) {
     }
 }
 
+// Draw Gameplay screen
 function DrawGame() {
-    DrawBackground();
-    DrawCanvas();
-    DrawUI();
+    DrawBackground();   // Parallax background
+    DrawCanvas();       // Foreground (sprites)
+    DrawUI();           // UI
 }
 
-function AnimateMenuSplash(logoMult) {
-
-}
-
-function DrawMenuText(text, sizeSelected, sizeUnselected, pos, spacing, fillCol, strokeColInner, strokeColOuter, shadowCol, strokeWidthInner, strokeWidthOuter, align, baseline, selectID, logoMult) {
-    if (selected == selectID) {
-        DrawText(text, (sizeSelected * logoMult), [pos[0] + (10 * screenScale), pos[1] + (spacing * screenScale) + (10 * screenScale)], shadowCol, shadowCol, strokeWidthOuter, align, baseline);  // Shadow
-        DrawText(text, (sizeSelected * logoMult), [pos[0], pos[1] + (spacing * screenScale)], fillCol, strokeColOuter, strokeWidthOuter, align, baseline);              // Outer
-        DrawText(text, (sizeSelected * logoMult), [pos[0], pos[1] + (spacing * screenScale)], fillCol, strokeColInner, strokeWidthInner, align, baseline);              // Inner
-    }
-    else {
-        DrawText(text, (sizeUnselected), [pos[0] + (10 * screenScale), pos[1] + (spacing * screenScale) + (10 * screenScale)], shadowCol, shadowCol, strokeWidthOuter, align, baseline);  // Shadow
-        DrawText(text, (sizeUnselected), [pos[0], pos[1] + (spacing * screenScale)], fillCol, strokeColOuter, strokeWidthOuter, align, baseline);              // Outer
-        DrawText(text, (sizeUnselected), [pos[0], pos[1] + (spacing * screenScale)], fillCol, strokeColInner, strokeWidthInner, align, baseline);              // Inner
-    }
-}
-
+// Change the game state and reset menu options
 function ChangeState(state) {
     if (state == 1)
-        isAnimating = true;
+        isAnimating = true;     // Animate sprites during gameplay
     else
         isAnimating = false;
 
-    selected = 0;
-    counter = 0;
-    menuOptions.length = numOptions[state];
-    currentGameState = GAMESTATES[state];
+    menuSelect.currentTime = 0;
+    menuSelect.play();
+    selected = 0;                               // Default to first menu option when changing gamestates
+    counter = 0;                                // Reset menu option pulse effect on state change
+    menuOptions.length = numOptions[state];     // Set menu option array length according to gamestate
+    currentGameState = GAMESTATES[state];       // Change to specified gamestate
 }
 
+// Draw splash screen
 function DrawSplash(logoMult) {
-    
+    // Clear layers
     UICtx.clearRect(0, 0, width, height);
-    UICtx.clearRect(0, 0, width, height);
-    DrawBackground();
     foregroundCtx.clearRect(0, 0, width, height);
+    // Draw background
+    DrawBackground();
+    // UI: title
     UICtx.drawImage(titleImg, width / 2 - (titleImg.width * screenScale) / 2, 100, titleImg.width * screenScale, titleImg.height * screenScale);
+    // UI: menu options
     DrawMenuText("PLAY", 150, 65, splashPos, 0, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 0, logoMult);
     DrawMenuText("INSTRUCTIONS", 150, 65, splashPos, 100, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 1, logoMult);
     DrawMenuText("HISCORES", 150, 65, splashPos, 200, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 2, logoMult);
 }
 
-function DrawGameOver(logoMult) {
+// Draw hiscore screen
+function DrawHiscore(logoMult) {
+    // Clear layers
     backgroundCtx.clearRect(0, 0, width, height);
     foregroundCtx.clearRect(0, 0, width, height);
     UICtx.clearRect(0, 0, width, height);
+    // Draw background
     DrawBackground();
     backgroundCtx.fillStyle = 'rgba(0,0,0,0.3)';
-    backgroundCtx.fillRect(0, 0, width, height);
+    backgroundCtx.fillRect(0, 0, width, height);    // Apply darkening filter over background
+    // UI: title
+    var titlePos = [width / 2, 75 * screenScale];
+    DrawText("HISCORE", 100, titlePos, "white", "black", 35, "center", "top");
+    var scorePos = [width / 2, height/2];
+    DrawText("Hiscore: " + hiscore, 75, scorePos, "white", "black", 35, "center", "middle");
+    // UI: menu options
+    DrawMenuText("RETURN TO MENU", 150, 65, [width / 2, height - 200 * screenScale], 75, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 0, logoMult);
+}
+
+// Draw game over screen
+function DrawGameOver(logoMult) {
+    // Clear layers
+    backgroundCtx.clearRect(0, 0, width, height);
+    foregroundCtx.clearRect(0, 0, width, height);
+    UICtx.clearRect(0, 0, width, height);
+    // Draw background
+    DrawBackground();
+    backgroundCtx.fillStyle = 'rgba(0,0,0,0.3)';
+    backgroundCtx.fillRect(0, 0, width, height);    // Apply darkening filter over background
+    // UI: title
     var titlePos = [width / 2, 75 * screenScale];
     DrawText("GAME OVER", 100, titlePos, "white", "black", 35, "center", "top");
     var scorePos = [width / 2, 250 * screenScale];
+    // UI: menu options
     DrawText("Score: " + score, 75, scorePos, "white", "black", 35, "center", "top");
+    if (newHiscore) {
+        scorePos = [scorePos[0], 350 * screenScale];
+        DrawText("New hiscore!", 75, scorePos, "white", "black", 35, "center", "top");
+    }
     DrawMenuText("RETRY", 150, 65, splashPos, 75, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 0, logoMult);
     DrawMenuText("EXIT", 150, 65, splashPos, 200, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 1, logoMult);
 }
 
+// Draw pause screen
 function DrawPause(logoMult) {
+    // Clear layers
     UICtx.clearRect(0, 0, width, height);
+    // Draw background and sprites
     DrawBackground();
     DrawCanvas();
+    // Apply darkening over background and sprites
     backgroundCtx.fillStyle = 'rgba(0,0,0,0.3)';
     backgroundCtx.fillRect(0, 0, width, height);
     foregroundCtx.fillStyle = 'rgba(0,0,0,0.3)';
     foregroundCtx.fillRect(0, 0, width, height);
+    // UI: title
     var titlePos = [width / 2, 75 * screenScale];
     DrawText("PAUSED", 100, titlePos, "white", "black", 35, "center", "top");
+    // UI: menu options
     DrawMenuText("RESUME", 150, 65, splashPos, 0, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 0, logoMult);
     DrawMenuText("RESET", 150, 65, splashPos, 100, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 1, logoMult);
-    DrawMenuText("OPTIONS", 150, 65, splashPos, 200, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 2, logoMult);
-    DrawMenuText("EXIT", 150, 65, splashPos, 300, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 3, logoMult);
+    DrawMenuText("EXIT", 150, 65, splashPos, 200, "DarkTurquoise", "white", "black", "white", 20, 45, "center", "middle", 2, logoMult);
 }
 
+// Draw parallax background
 function DrawBackground() {
+    // Clear layer
     backgroundCtx.clearRect(0, 0, width, height);
     // Parallax: Back plane
     for (var i = 0; i < backgroundScroll.length; i++) {
@@ -1668,9 +1739,7 @@ function DrawBackground() {
     }
     // Parallax: Tree plane
     for (var i = 0; i < treesScroll.length; i++) {
-        //console.log(treesScroll[i].);
         backgroundCtx.drawImage(treesScroll[i].image, treesScroll[i].x, 0, treesScroll[i].width * screenScale, treesScroll[i].height * screenScale);
-        //console.log(treesScroll[i].y);
     }
     // Parallax: Highway plane
     for (var i = 0; i < highwayScroll.length; i++) {
@@ -1679,16 +1748,11 @@ function DrawBackground() {
 
 }
 
+// Draw foreground canvas
 function DrawCanvas() {
+    // Clear layer
     foregroundCtx.clearRect(0, 0, width, height);
 
-    // Animate sprites
-    if (isAnimating) {
-        AnimationFrame(player);
-        for (var i = 0; i < playerBullets.length; i++) {
-            AnimationFrame(playerBullets[i]);
-        }
-    }
     // Draw player
     foregroundCtx.drawImage(playerImg, player.spriteWidth * player.frameX, player.spriteHeight * player.frameY, player.spriteWidth, player.spriteHeight, player.x, player.y, player.width * screenScale, player.height * screenScale);
     // Draw bullets
@@ -1701,40 +1765,49 @@ function DrawCanvas() {
             AnimationFrame(enemies[i]);
         foregroundCtx.drawImage(enemies[i].sprite, enemies[i].spriteWidth * enemies[i].frameX, enemies[i].spriteHeight * enemies[i].frameY, enemies[i].spriteWidth, enemies[i].spriteHeight, enemies[i].x, enemies[i].y, enemies[i].width * screenScale, enemies[i].height * screenScale);
     }
-
+    // Draw powerups
     for (var i = 0; i < powerups.length; i++) {
         foregroundCtx.drawImage(powerups[i].img, powerups[i].x, powerups[i].y, powerups[i].width * screenScale, powerups[i].height * screenScale);
     }
-
-
-
+    // Animate sprites
+    if (isAnimating) {
+        AnimationFrame(player);
+        for (var i = 0; i < playerBullets.length; i++) {
+            AnimationFrame(playerBullets[i]);
+        }
+    }
 }
 
-
+// Draw gameplay UI
 function DrawUI() {
+    // Clear layer
     UICtx.clearRect(0, 0, width, height);
+    // Score text
     var text = "Score: " + score;
     DrawText(text, 30 * screenScale, [25 * screenScale, 25 * screenScale], "white", "black", 8, "left", "top");
+    // Health text
     text = "Health: " + player.health;
     DrawText(text, 30 * screenScale, [25 * screenScale, 65 * screenScale], "white", "black", 8, "left", "top");
-    for (var i = 0; i < player.healthMax; i++) {
-        if (player.health-1 < i) {
+    // Health indicator
+    for (var i = 0; i < player.healthMax; i++) {    // Draw indicator transparent when below iterated health value
+        if (player.health - 1 < i) {
             UICtx.globalAlpha = 0.2;
             UICtx.drawImage(heartImg, 25 * screenScale + (i * 60) * screenScale, 110 * screenScale, 50, 47);
         }
-        else {
+        else {                                      // Draw health indicator at full opacity when player health above interated value
             UICtx.globalAlpha = 1;
             UICtx.drawImage(heartImg, 25 * screenScale + (i * 60) * screenScale, 110 * screenScale, 50, 47);
         }
 
-        UICtx.globalAlpha = 1;
+        UICtx.globalAlpha = 1;  // Return global alpha to opaque
     }
 
+    // Set level text colour depending on current level
     var textCol = "";
     if (level < 2)
         textCol = "DarkTurquoise";
     else if (level < 3)
-        textCol = "Green";
+        textCol = "Chartreuse ";
     else if (level < 4)
         textCol = "Gold";
     else if (level < 5)
@@ -1744,35 +1817,47 @@ function DrawUI() {
     else
         textCol = "DeepPink"
 
-    if (level < 6)
+    if (level < 6)  // Draw level text using determined colour below max level
         DrawMenuText("LEVEL " + level, 75, 75, [width / 2, 25 * screenScale], 0, textCol, "white", "black", "white", 10, 25, "center", "top", 0);
-    else
+    else            // Draw level text using set colour when max level reached
         DrawMenuText("LEVEL MAX", 75, 75, [width / 2, 25 * screenScale], 0, textCol, "white", "black", "white", 10, 25, "center", "top", 0);
 
     if (particles.length > 0) {
         for (var i = particles.length - 1; i >= 0; i--) {
-            particles[i].update();
-            if (particles[i].alpha < 0) {
-                particles.splice(i, 1);
+            particles[i].update();          // Update particles if array isn't empty
+            UICtx.fillStyle = "rgba(" + particles[i].r + "," + particles[i].g + "," + particles[i].b + "," + particles[i].alpha + ")";
+            particles[i].Draw(UICtx);       // Draw particle using specified colour values
+            if (particles[i].alpha <= 0) {
+                particles.splice(i, 1);     // Delete particle when alpha reaches 0
                 i--;
-            }
-            if (particles.length > 0) {
-                UICtx.fillStyle = "rgba(" + particles[i].r + "," + particles[i].g + "," + particles[i].b + "," + particles[i].alpha + ")";
-                particles[i].Draw(UICtx);
             }
         }
     }
 }
 
+// Generic text draw function (title text)
 function DrawText(text, size, pos, fillCol, strokeCol, strokeWidth, align, baseline) {
-    UICtx.font = '' + (size * screenScale) + 'px "Joystix"';
-    UICtx.textAlign = align;
-    UICtx.strokeStyle = strokeCol;
-    UICtx.lineWidth = strokeWidth * screenScale;
-    UICtx.textBaseline = baseline;
-    UICtx.strokeText(text, pos[0], pos[1]);
-    UICtx.fillStyle = fillCol;
-    UICtx.textBaseline = baseline;
-    UICtx.fillText(text, pos[0], pos[1]);
+    UICtx.font = '' + (size * screenScale) + 'px "Joystix"';    // Set font
+    UICtx.textAlign = align;                                    // Set text alignment
+    UICtx.strokeStyle = strokeCol;                              // Set stroke colour
+    UICtx.lineWidth = strokeWidth * screenScale;                // Set stroke width
+    UICtx.textBaseline = baseline;                              // Set text baseline
+    UICtx.strokeText(text, pos[0], pos[1]);                     // Stroke text at position
+    UICtx.fillStyle = fillCol;                                  // Set text fill colour
+    UICtx.fillText(text, pos[0], pos[1]);                       // Fill text at position
 
+}
+
+// Generic text draw function (menu text)
+function DrawMenuText(text, sizeSelected, sizeUnselected, pos, spacing, fillCol, strokeColInner, strokeColOuter, shadowCol, strokeWidthInner, strokeWidthOuter, align, baseline, selectID, logoMult) {
+    if (selected == selectID) { // Draw menu text when selected
+        DrawText(text, (sizeSelected * logoMult), [pos[0] + (10 * screenScale), pos[1] + (spacing * screenScale) + (10 * screenScale)], shadowCol, shadowCol, strokeWidthOuter, align, baseline);   // Shadow
+        DrawText(text, (sizeSelected * logoMult), [pos[0], pos[1] + (spacing * screenScale)], fillCol, strokeColOuter, strokeWidthOuter, align, baseline);                                          // Outer
+        DrawText(text, (sizeSelected * logoMult), [pos[0], pos[1] + (spacing * screenScale)], fillCol, strokeColInner, strokeWidthInner, align, baseline);                                          // Inner
+    }
+    else {                      // Draw menu text when deselected
+        DrawText(text, (sizeUnselected), [pos[0] + (10 * screenScale), pos[1] + (spacing * screenScale) + (10 * screenScale)], shadowCol, shadowCol, strokeWidthOuter, align, baseline);    // Shadow
+        DrawText(text, (sizeUnselected), [pos[0], pos[1] + (spacing * screenScale)], fillCol, strokeColOuter, strokeWidthOuter, align, baseline);                                           // Outer
+        DrawText(text, (sizeUnselected), [pos[0], pos[1] + (spacing * screenScale)], fillCol, strokeColInner, strokeWidthInner, align, baseline);                                           // Inner
+    }
 }
