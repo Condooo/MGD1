@@ -860,6 +860,8 @@ function PlayerControl() {                                                   // 
         }
         player.isShooting = true;
     }
+    else
+        player.isShooting = false;
 
     if (keys[68]) {                                         // D: Right
         if (!player.isShooting)
